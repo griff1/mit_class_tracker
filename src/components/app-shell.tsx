@@ -33,7 +33,7 @@ export function AppShell({
             alt="MIT Sloan"
             width={3300}
             height={2550}
-            className="h-12 w-auto"
+            className="h-16 w-auto"
             priority
           />
           <span className="hidden font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-3 sm:inline">
