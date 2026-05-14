@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { signOut } from "@/app/auth/actions";
+import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -10,15 +11,15 @@ export default async function Home() {
 
   if (!user) {
     return (
-      <main className="mx-auto flex max-w-2xl flex-1 flex-col justify-center gap-8 p-8">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-8 p-8">
         <header className="flex flex-col gap-3">
-          <p className="text-sm font-medium uppercase tracking-wider text-brand-700">
+          <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-brand-700">
             MIT Sloan Class of 2026
           </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-stone-900">
+          <h1 className="text-4xl font-semibold tracking-tight text-ink">
             Stay in touch with your class.
           </h1>
-          <p className="text-stone-600">
+          <p className="text-ink-2">
             A private directory for finding classmates, sharing where you landed,
             and keeping the cohort connected after graduation.
           </p>
@@ -26,13 +27,13 @@ export default async function Home() {
         <div className="flex gap-3">
           <Link
             href="/sign-in"
-            className="rounded-md bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-brand-600"
+            className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-cream transition hover:bg-ink-2"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="rounded-md border border-stone-300 bg-white px-5 py-2.5 text-sm font-medium text-stone-800 transition hover:border-stone-400 hover:bg-stone-50"
+            className="rounded-md border border-line-2 bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:border-brand-400"
           >
             Sign up
           </Link>
@@ -41,95 +42,118 @@ export default async function Home() {
     );
   }
 
-  return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-8">
-      <header className="flex items-baseline justify-between gap-4 border-b border-stone-200 pb-5">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-brand-700">
-            Class of 2026
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
-            MIT Sloan Directory
-          </h1>
-        </div>
-        <form action={signOut}>
-          <button
-            type="submit"
-            className="text-sm text-stone-600 underline-offset-4 hover:text-brand-700 hover:underline"
-          >
-            Sign out
-          </button>
-        </form>
-      </header>
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("name, ocean")
+    .eq("id", user.id)
+    .maybeSingle();
 
-      <p className="text-sm text-stone-600">
-        Signed in as <code className="font-mono text-stone-800">{user.email}</code>.
-      </p>
+  // Cheap aggregates for the stats strip.
+  const { count: peopleCount } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true });
+
+  const { data: cityRows } = await supabase
+    .from("profiles")
+    .select("city")
+    .not("city", "is", null);
+
+  const cities = new Set((cityRows ?? []).map((r) => r.city)).size;
+
+  const { data: indRows } = await supabase
+    .from("profiles")
+    .select("industries");
+
+  const industries = new Set(
+    (indRows ?? []).flatMap((r) => (r.industries as string[] | null) ?? []),
+  ).size;
+
+  const firstName = (profile?.name ?? user.email)?.split(" ")[0] ?? "there";
+  const ocean = profile?.ocean ?? null;
+
+  return (
+    <AppShell active="home" user={{ name: profile?.name ?? null, email: user.email! }}>
+      <PageHeader
+        eyebrow={`Welcome back, ${firstName}`}
+        title={ocean ? `Class of 2026 · ${ocean}` : "Class of 2026"}
+        sub={`${peopleCount ?? 0} classmates, ${cities} ${cities === 1 ? "city" : "cities"}, ${industries} ${industries === 1 ? "industry" : "industries"} represented.`}
+      />
+
+      <section className="flex items-stretch gap-0 rounded-md border border-line bg-paper">
+        <StatTile k="people" v={String(peopleCount ?? 0)} />
+        <StatTile k="cities" v={String(cities)} />
+        <StatTile k="industries" v={String(industries)} />
+      </section>
 
       <nav className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <NavCard
+        <NavTile
+          num="01"
+          label="Yourself"
           href="/profile"
           title="Your profile"
-          description="Update your info — company, title, city, LinkedIn."
-          available
+          description="Update company, title, city, LinkedIn."
         />
-        <NavCard
+        <NavTile
+          num="02"
+          label="Browse"
           href="/directory"
           title="Directory"
-          description="Search classmates by industry, role, or city."
-          available
+          description={`Search ${peopleCount ?? 0} classmates by industry, role, city.`}
         />
-        <NavCard
-          href="#"
-          title="Map"
-          description="See where everyone landed, aggregated by city."
-        />
-        <NavCard
-          href="#"
-          title="Stats"
-          description="Top cities and industries across the cohort."
-        />
+        <NavTile num="03" label="Soon" title="Map" description="Where everyone landed, aggregated by city." soon />
+        <NavTile num="04" label="Soon" title="Stats" description="Top cities and industries across the cohort." soon />
       </nav>
-    </main>
+    </AppShell>
   );
 }
 
-function NavCard({
+function StatTile({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex-1 border-r border-line px-5 py-4 last:border-r-0">
+      <div className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-3">{k}</div>
+      <div className="mt-1 text-2xl font-semibold tracking-tight text-ink">{v}</div>
+    </div>
+  );
+}
+
+function NavTile({
+  num,
+  label,
   href,
   title,
   description,
-  available = false,
+  soon,
 }: {
-  href: string;
+  num: string;
+  label: string;
+  href?: string;
   title: string;
   description: string;
-  available?: boolean;
+  soon?: boolean;
 }) {
-  const classes =
-    "flex flex-col gap-1 rounded-lg border bg-white p-4 transition";
-  if (!available) {
+  const inner = (
+    <>
+      <span className="absolute right-4 top-3 font-mono text-[0.6rem] tracking-wider text-ink-3">
+        {num}
+      </span>
+      <span className={`font-mono text-[0.6rem] uppercase tracking-[0.18em] ${soon ? "text-ink-3" : "text-brand-700"}`}>
+        {label}
+      </span>
+      <h3 className="mt-1 text-base font-semibold tracking-tight text-ink">{title}</h3>
+      <p className="text-sm text-ink-2">{description}</p>
+    </>
+  );
+  const base = "relative flex flex-col rounded-md border border-line bg-paper px-5 py-4";
+  if (soon) {
     return (
-      <div
-        className={`${classes} cursor-not-allowed border-stone-200 opacity-60`}
-        aria-disabled="true"
-      >
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-base font-medium text-stone-700">{title}</h2>
-          <span className="text-xs font-medium uppercase tracking-wider text-stone-400">
-            Soon
-          </span>
-        </div>
-        <p className="text-sm text-stone-500">{description}</p>
+      <div className={`${base} cursor-not-allowed opacity-60`} aria-disabled="true">
+        {inner}
       </div>
     );
   }
   return (
-    <Link
-      href={href}
-      className={`${classes} border-stone-200 hover:border-brand-400 hover:bg-brand-50`}
-    >
-      <h2 className="text-base font-medium text-stone-900">{title}</h2>
-      <p className="text-sm text-stone-600">{description}</p>
+    <Link href={href!} className={`${base} transition hover:border-brand-400`}>
+      {inner}
     </Link>
   );
 }
