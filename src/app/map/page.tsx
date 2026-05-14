@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/viewer";
 import { CITY_COORDS } from "@/lib/cities-geo";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -12,11 +13,7 @@ export default async function MapPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("name")
-    .eq("id", user.id)
-    .maybeSingle<{ name: string | null }>();
+  const viewer = await getViewer(supabase, user);
 
   const { data: rows } = await supabase.from("profiles").select("cities");
 
@@ -52,7 +49,7 @@ export default async function MapPage() {
   }
 
   return (
-    <AppShell active="map" user={{ name: me?.name ?? null, email: user.email! }}>
+    <AppShell active="map" user={viewer}>
       <PageHeader
         eyebrow="Class of 2026"
         title="Where everyone is"

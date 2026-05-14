@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/viewer";
 import {
   ACTIVITIES,
   CITIES,
   INDUSTRIES,
   OCEANS,
   ROLES,
-  type Profile,
 } from "@/lib/types";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -64,11 +64,7 @@ export default async function DirectoryPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("name")
-    .eq("id", user.id)
-    .maybeSingle<Pick<Profile, "name">>();
+  const viewer = await getViewer(supabase, user);
 
   // Build chip options as seed ∪ cohort, deduped case-insensitively.
   const { data: cohort } = await supabase
@@ -136,7 +132,7 @@ export default async function DirectoryPage({
   );
 
   return (
-    <AppShell active="directory" user={{ name: me?.name ?? null, email: user.email! }}>
+    <AppShell active="directory" user={viewer}>
       <PageHeader
         eyebrow="Class of 2026"
         title="Directory"

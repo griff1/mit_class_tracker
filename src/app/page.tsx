@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/viewer";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 
@@ -42,11 +43,7 @@ export default async function Home() {
     );
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("name, ocean")
-    .eq("id", user.id)
-    .maybeSingle();
+  const viewer = await getViewer(supabase, user);
 
   // Cheap aggregates for the stats strip.
   const { count: peopleCount } = await supabase
@@ -69,14 +66,13 @@ export default async function Home() {
     (indRows ?? []).flatMap((r) => (r.industries as string[] | null) ?? []),
   ).size;
 
-  const firstName = (profile?.name ?? user.email)?.split(" ")[0] ?? "there";
-  const ocean = profile?.ocean ?? null;
+  const firstName = (viewer.name ?? viewer.email).split(" ")[0] ?? "there";
 
   return (
-    <AppShell active="home" user={{ name: profile?.name ?? null, email: user.email! }}>
+    <AppShell active="home" user={viewer}>
       <PageHeader
         eyebrow={`Welcome back, ${firstName}`}
-        title={ocean ? `Class of 2026 · ${ocean}` : "Class of 2026"}
+        title={viewer.ocean ? `Class of 2026 · ${viewer.ocean}` : "Class of 2026"}
         sub={`${peopleCount ?? 0} classmates, ${cities} ${cities === 1 ? "city" : "cities"}, ${industries} ${industries === 1 ? "industry" : "industries"} represented.`}
       />
 

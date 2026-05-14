@@ -77,7 +77,15 @@ export default async function ProfilePage({
   const displayName = profile.name?.trim() || profile.mit_email;
 
   return (
-    <AppShell active="profile" user={{ name: profile.name, email: user.email! }}>
+    <AppShell
+      active="profile"
+      user={{
+        name: profile.name,
+        email: user.email!,
+        ocean: profile.ocean,
+        photoUrl,
+      }}
+    >
       <PageHeader
         eyebrow="Your profile"
         title={profile.name?.trim() || "Tell your class about yourself"}
@@ -219,7 +227,10 @@ function ErrorShell({
   message: string;
 }) {
   return (
-    <AppShell active="profile" user={{ name: null, email }}>
+    <AppShell
+      active="profile"
+      user={{ name: null, email, ocean: null, photoUrl: null }}
+    >
       <PageHeader eyebrow="Your profile" title={title} />
       <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
         {message}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 import { Avatar } from "@/components/avatar";
+import type { Viewer } from "@/lib/viewer";
 
 type SectionKey = "home" | "directory" | "map" | "stats" | "profile";
 
@@ -18,7 +19,7 @@ export function AppShell({
   children,
 }: {
   active: SectionKey;
-  user: { name: string | null; email: string };
+  user: Viewer;
   children: React.ReactNode;
 }) {
   const displayName = user.name?.trim() || user.email;
@@ -53,7 +54,7 @@ export function AppShell({
           })}
         </ul>
         <form action={signOut} className="flex items-center gap-3">
-          <Avatar name={displayName} size="sm" />
+          <Avatar name={displayName} size="sm" photoUrl={user.photoUrl} />
           <button
             type="submit"
             className="text-xs text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"

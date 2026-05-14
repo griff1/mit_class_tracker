@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/viewer";
 import { OCEANS, type Profile } from "@/lib/types";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -16,11 +17,7 @@ export default async function StatsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("name")
-    .eq("id", user.id)
-    .maybeSingle<{ name: string | null }>();
+  const viewer = await getViewer(supabase, user);
 
   const { data: rows } = await supabase
     .from("profiles")
@@ -35,7 +32,7 @@ export default async function StatsPage() {
   const oceanCounts = aggregateScalar(rows, "ocean");
 
   return (
-    <AppShell active="stats" user={{ name: me?.name ?? null, email: user.email! }}>
+    <AppShell active="stats" user={viewer}>
       <PageHeader
         eyebrow="Class of 2026"
         title="By the numbers"
