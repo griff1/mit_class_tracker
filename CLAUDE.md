@@ -34,10 +34,11 @@ A single `profiles` table keyed by `auth.users.id`:
 | `personal_email` | optional secondary contact, any domain, user-editable, **not** used for auth |
 | `company`, `title` | professional info |
 | `industries` | `text[]`, multi-select from a curated list (`INDUSTRIES` in `lib/types.ts`); GIN-indexed for `&&`/`@>` filters |
-| `city` | user-typed string; aggregated for the map (no addresses stored) |
+| `cities` | `text[]`, multi-select with **canonical case-insensitive dedup** at write time (see `resolveCanonical` in `src/app/profile/actions.ts`). Seeded with `CITIES` in `lib/types.ts`; members can add new entries which then appear as chips for everyone in the cohort. GIN-indexed. The map will aggregate on this. |
 | `linkedin_url` | LinkedIn profile URL |
 | `profile_photo_url` | Supabase Storage path/signed URL |
 | `ocean` | Sloan cohort (see glossary) |
+| `activities` | `text[]`, same add-new pattern as `cities`. Seeded with `ACTIVITIES` in `lib/types.ts`. Profile-page only — not yet a directory filter or a card display. |
 
 RLS shape (see `supabase/migrations/20260513180000_init.sql`):
 - `select`: any authenticated user (the directory is intra-class-visible)
@@ -70,23 +71,24 @@ If a query returns empty or an insert silently fails at the API layer, start her
 
 1. **Auth** — Supabase email auth + MIT-domain check + email confirmation required.
 2. **Profile** — view-and-edit screen covering every field above. Photo upload to Supabase Storage.
-3. **Map** — markers aggregated by `city`, one per city, count-labeled. `react-leaflet` with free tiles is a fine default; reach for Mapbox only if styling needs it.
-4. **Directory** — filterable/searchable table. Filters at minimum: industry, title/job type, city.
+3. **Map** — markers aggregated by `cities`, one per city, count-labeled. `react-leaflet` with free tiles is a fine default; reach for Mapbox only if styling needs it.
+4. **Directory** — filterable/searchable table. Filters: industries, cities, ocean, name search.
 5. **Stats** — top cities, top industries, breakdowns by ocean, etc.
 
 ## Layout
 
 - `src/app/page.tsx` — auth-aware home (logged-out → marketing/CTAs; logged-in → nav cards to feature areas + sign-out)
 - `src/app/sign-in/page.tsx`, `src/app/sign-up/page.tsx` — auth forms posting to Server Actions
-- `src/app/profile/page.tsx` — view-and-edit your own profile (auth-gated, redirects to sign-in); industries are checkboxes (multi)
-- `src/app/profile/actions.ts` — `updateProfile` Server Action; sanitizes inputs and allow-lists `industries`/`ocean` against the curated lists in `lib/types.ts` (server-side, can't be bypassed by editing the form)
-- `src/app/directory/page.tsx` — auth-gated class directory. Filters live in URL search params (bookmarkable); name search is `ilike`, industries use Postgres array overlap, ocean is `eq`, city is `ilike`. Plain GET form so back/forward and JS-disabled both work.
+- `src/app/profile/page.tsx` — view-and-edit your own profile (auth-gated, redirects to sign-in). Four numbered sections: Identity / Work / Place (cities, ocean, LinkedIn) / Sloan (activities).
+- `src/app/profile/actions.ts` — `updateProfile` Server Action. `industries`/`ocean` are allow-listed against the curated lists in `lib/types.ts`. `cities`/`activities` go through `resolveCanonical` — a server-side case-insensitive dedup against the cohort's existing values plus the seed list, so user write-ins canonicalize to existing entries instead of duplicating.
+- `src/app/directory/page.tsx` — auth-gated class directory. Filters in URL search params (bookmarkable): name (`ilike`), industries / cities (Postgres array `overlaps`), ocean (`eq`). Plain GET form so back/forward and JS-disabled both work.
+- `src/components/editable-chip-group.tsx` — pairs a `Chip` multi-select with a "add new" `Input` for the same field. Used for cities and activities on the profile page.
 - `src/app/auth/actions.ts` — `signIn` / `signUp` / `signOut` Server Actions; sign-up applies the `@mit.edu` check before calling Supabase
 - `src/app/auth/confirm/route.ts` — Route Handler that exchanges the email-confirmation token for a session. Handles BOTH the PKCE `?code=` flow (default Supabase template) and the `?token_hash=&type=` flow (custom template). Either works.
 - `src/lib/supabase/client.ts` — browser Supabase client for Client Components
 - `src/lib/supabase/server.ts` — server Supabase client (Server Components / Route Handlers / Server Actions); awaits `cookies()`
 - `src/lib/supabase/proxy.ts` — `updateSession` helper that refreshes auth cookies on every request
-- `src/lib/types.ts` — `Profile` row shape + curated `INDUSTRIES` / `OCEANS` lists used by both the form and the server-side allow-list check
+- `src/lib/types.ts` — `Profile` row shape + curated `INDUSTRIES`, `OCEANS`, `CITIES`, `ACTIVITIES` seed lists. `INDUSTRIES` and `OCEANS` are strict allow-lists (server rejects anything outside); `CITIES` and `ACTIVITIES` are seeds — write-ins are allowed and resolved against existing cohort values for canonical casing.
 - `src/proxy.ts` — Next.js 16 Proxy entry (was `middleware.ts` in v15 and earlier); delegates to `updateSession`
 - `supabase/migrations/*.sql` — versioned schema and Auth Hook function. Apply via `supabase db push`, or paste into Dashboard → SQL Editor in filename order.
 - `.env.example` — template for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`. Copy to `.env.local`.
