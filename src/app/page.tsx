@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/viewer";
+import { CITY_COORDS } from "@/lib/cities-geo";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
+import { ClassMap, type MapAggregate } from "@/components/class-map";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -43,7 +45,8 @@ export default async function Home() {
 
   const viewer = await getViewer(supabase, user);
 
-  // Cheap aggregates for the stats strip.
+  // Cheap aggregates for the stats strip + map. One profile-row query feeds
+  // both the distinct-city count and the per-city pin counts.
   const { count: peopleCount } = await supabase
     .from("profiles")
     .select("*", { count: "exact", head: true });
@@ -55,6 +58,25 @@ export default async function Home() {
   const cities = new Set(
     (cityRows ?? []).flatMap((r) => (r.cities as string[] | null) ?? []),
   ).size;
+
+  const cityCounts = new Map<string, number>();
+  for (const r of cityRows ?? []) {
+    for (const c of (r.cities as string[] | null) ?? []) {
+      cityCounts.set(c, (cityCounts.get(c) ?? 0) + 1);
+    }
+  }
+  const mapped: MapAggregate[] = [];
+  const unmapped: { city: string; count: number }[] = [];
+  for (const [city, count] of cityCounts.entries()) {
+    const coords = CITY_COORDS[city.toLowerCase()];
+    if (coords) {
+      mapped.push({ city, count, ...coords });
+    } else {
+      unmapped.push({ city, count });
+    }
+  }
+  unmapped.sort((a, b) => b.count - a.count);
+  const unmappedTotal = unmapped.reduce((acc, u) => acc + u.count, 0);
 
   const { data: indRows } = await supabase
     .from("profiles")
@@ -80,7 +102,24 @@ export default async function Home() {
         <StatTile k="industries" v={String(industries)} />
       </section>
 
-      <nav className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <section className="flex flex-col gap-2">
+        <h2 className="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-brand-700">
+          Where everyone is
+        </h2>
+        <div className="overflow-hidden rounded-md border border-line bg-paper">
+          <ClassMap aggregates={mapped} />
+        </div>
+        {unmapped.length > 0 && (
+          <p className="text-xs text-ink-3">
+            {unmappedTotal} {unmappedTotal === 1 ? "person" : "people"} in{" "}
+            {unmapped.length} {unmapped.length === 1 ? "city" : "cities"} not
+            yet pinned —{" "}
+            {unmapped.map((u) => `${u.city} (${u.count})`).join(", ")}
+          </p>
+        )}
+      </section>
+
+      <nav className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <NavTile
           num="01"
           label="Yourself"
@@ -97,13 +136,6 @@ export default async function Home() {
         />
         <NavTile
           num="03"
-          label="Visualize"
-          href="/map"
-          title="Map"
-          description="Where everyone landed, aggregated by city."
-        />
-        <NavTile
-          num="04"
           label="Aggregate"
           href="/stats"
           title="Stats"
@@ -129,38 +161,26 @@ function NavTile({
   href,
   title,
   description,
-  soon,
 }: {
   num: string;
   label: string;
-  href?: string;
+  href: string;
   title: string;
   description: string;
-  soon?: boolean;
 }) {
-  const inner = (
-    <>
+  return (
+    <Link
+      href={href}
+      className="relative flex flex-col rounded-md border border-line bg-paper px-5 py-4 transition hover:border-brand-400"
+    >
       <span className="absolute right-4 top-3 font-mono text-[0.6rem] tracking-wider text-ink-3">
         {num}
       </span>
-      <span className={`font-mono text-[0.6rem] uppercase tracking-[0.18em] ${soon ? "text-ink-3" : "text-brand-700"}`}>
+      <span className="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-brand-700">
         {label}
       </span>
       <h3 className="mt-1 text-base font-semibold tracking-tight text-ink">{title}</h3>
       <p className="text-sm text-ink-2">{description}</p>
-    </>
-  );
-  const base = "relative flex flex-col rounded-md border border-line bg-paper px-5 py-4";
-  if (soon) {
-    return (
-      <div className={`${base} cursor-not-allowed opacity-60`} aria-disabled="true">
-        {inner}
-      </div>
-    );
-  }
-  return (
-    <Link href={href!} className={`${base} transition hover:border-brand-400`}>
-      {inner}
     </Link>
   );
 }

@@ -4,12 +4,11 @@ import { signOut } from "@/app/auth/actions";
 import { Avatar } from "@/components/avatar";
 import type { Viewer } from "@/lib/viewer";
 
-type SectionKey = "home" | "directory" | "map" | "stats" | "profile";
+type SectionKey = "home" | "directory" | "stats" | "profile";
 
 const SECTIONS: { key: SectionKey; href: string; label: string; available: boolean }[] = [
   { key: "home", href: "/", label: "Home", available: true },
   { key: "directory", href: "/directory", label: "Directory", available: true },
-  { key: "map", href: "/map", label: "Map", available: true },
   { key: "stats", href: "/stats", label: "Stats", available: true },
   { key: "profile", href: "/profile", label: "Profile", available: true },
 ];

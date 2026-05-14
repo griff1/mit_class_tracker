@@ -28,7 +28,7 @@ export function ClassMap({ aggregates }: { aggregates: MapAggregate[] }) {
       center={[25, 0]}
       zoom={2}
       worldCopyJump
-      style={{ height: "70vh", width: "100%" }}
+      style={{ height: 420, width: "100%" }}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

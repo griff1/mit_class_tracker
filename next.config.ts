@@ -35,6 +35,8 @@ const nextConfig: NextConfig = {
       // Sign-up and sign-in collapsed under magic-link auth — same form
       // handles both flows. Preserve the old URL for any existing bookmarks.
       { source: "/sign-up", destination: "/sign-in", permanent: true },
+      // /map embedded into the home page. Preserve the old URL.
+      { source: "/map", destination: "/", permanent: true },
     ];
   },
 };
