@@ -37,9 +37,9 @@ A single `profiles` table keyed by `auth.users.id`:
 | `roles` | `text[]`, multi-select of functional roles ("Product Manager", "Software Engineer", etc.). Seed in `ROLES`. Add-new + canonical dedup. GIN-indexed. Shown on profile cards as coral-tinted chips, distinct from the line-bordered industry chips. |
 | `cities` | `text[]`, multi-select with **canonical case-insensitive dedup** at write time (see `resolveCanonical` in `src/app/profile/actions.ts`). Seeded with `CITIES` in `lib/types.ts`; members can add new entries which then appear as chips for everyone in the cohort. GIN-indexed. The map aggregates on this. |
 | `linkedin_url` | LinkedIn profile URL |
-| `profile_photo_url` | Supabase Storage path/signed URL |
+| `profile_photo_url` | **Stores a Storage path** (e.g. `<user_id>/avatar`), not a URL — despite the column name. Signed URLs are generated at render time. `null` means "no photo, render initial." |
 | `ocean` | Sloan cohort (see glossary) |
-| `activities` | `text[]`, same add-new pattern as `cities`. Seeded with `ACTIVITIES` in `lib/types.ts`. Profile-page only — not yet a directory filter or a card display. |
+| `activities` | `text[]`, same add-new pattern as `cities`. Seeded with `ACTIVITIES` in `lib/types.ts`. |
 
 RLS shape (see `supabase/migrations/20260513180000_init.sql`):
 - `select`: any authenticated user (the directory is intra-class-visible)
@@ -47,7 +47,7 @@ RLS shape (see `supabase/migrations/20260513180000_init.sql`):
 - `insert`: no policy — rows are created exclusively by the `on_auth_user_confirmed` trigger, which fires only when `auth.users.email_confirmed_at` transitions from NULL to non-NULL. **Unconfirmed signups never become rows in `profiles`** — that's the safety net against `fake@mit.edu`-style accounts polluting the directory.
 - `delete`: no policy — deletion happens via cascade when an `auth.users` row is removed
 
-Profile photos live in a Supabase Storage bucket with public-read **disabled** — serve via signed URLs or an RLS-gated bucket so photos can't be enumerated without a session.
+Profile photos live in the private `profile-photos` Storage bucket (created by `supabase/migrations/20260514180400_profile_photos_bucket.sql`). RLS: any authenticated user reads, each user can only write to their own `<user_id>/` folder. Files always live at `<user_id>/avatar` (no extension — content-type is stored as metadata). The Server Action upserts so re-uploading replaces. The `next.config.ts` body-size limit is bumped to 5MB so phone-camera JPEGs don't get silently rejected. **Rendering:** generate signed URLs at request time — single `createSignedUrl(path, 3600)` on the profile page, batch `createSignedUrls([paths], 3600)` on the directory page (one round trip for all visible cards).
 
 ## Supabase project setup
 
@@ -81,7 +81,7 @@ If a query returns empty or an insert silently fails at the API layer, start her
 - `src/app/page.tsx` — auth-aware home (logged-out → marketing/CTAs; logged-in → nav cards to feature areas + sign-out)
 - `src/app/sign-in/page.tsx`, `src/app/sign-up/page.tsx` — auth forms posting to Server Actions
 - `src/app/profile/page.tsx` — view-and-edit your own profile (auth-gated, redirects to sign-in). Four numbered sections: Identity / Work / Place (cities, ocean, LinkedIn) / Sloan (activities).
-- `src/app/profile/actions.ts` — `updateProfile` Server Action. `ocean` is allow-listed (no add-new). `industries`, `roles`, `cities`, `activities` all go through `resolveCanonical` — server-side case-insensitive dedup against the cohort's existing values plus the seed list, so user write-ins canonicalize to existing entries instead of duplicating.
+- `src/app/profile/actions.ts` — `updateProfile` Server Action. `ocean` is allow-listed (no add-new). `industries`, `roles`, `cities`, `activities` all go through `resolveCanonical` — server-side case-insensitive dedup against the cohort's existing values plus the seed list, so user write-ins canonicalize to existing entries instead of duplicating. Also handles the optional `profile_photo` File entry: validates size (≤5MB) + MIME (jpeg/png/webp/gif), upserts to `profile-photos/<user_id>/avatar`, stores the path on the row.
 - `src/app/directory/page.tsx` — auth-gated class directory. Filters in URL search params (bookmarkable): name (`ilike`), ocean (`eq`), and `industries` / `roles` / `cities` / `activities` (Postgres array `overlaps`). Plain GET form so back/forward and JS-disabled both work. The four array-filter groups are collapsible via `<details>` — they default to closed and auto-open when the URL has active selections so the user sees what's applied.
 - `src/app/map/page.tsx` — auth-gated map view. Server-aggregates `profiles.cities` → counts, joins to `CITY_COORDS`, renders the leaflet map. Cities without coordinates surface in a `<details>` disclosure (with a hint to add them to `lib/cities-geo.ts`).
 - `src/app/stats/page.tsx` — auth-gated stats grid: top 10 cities / top 10 industries / oceans (full ordered list including zeros) / top 10 activities. JS-side aggregation from one Supabase query; thin coral bars rendered with plain CSS (no chart library).
