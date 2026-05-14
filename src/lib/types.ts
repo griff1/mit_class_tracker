@@ -6,6 +6,7 @@ export type Profile = {
   company: string | null;
   title: string | null;
   industries: string[];
+  roles: string[];
   cities: string[];
   linkedin_url: string | null;
   profile_photo_url: string | null;
@@ -15,6 +16,9 @@ export type Profile = {
   updated_at: string;
 };
 
+// Seed list for industries. Members can add new entries which then appear as
+// chips for everyone in the cohort. Server-side `resolveCanonical` handles
+// case-insensitive dedup against the cohort + this seed.
 export const INDUSTRIES = [
   "Tech",
   "Finance",
@@ -31,7 +35,29 @@ export const INDUSTRIES = [
   "Other",
 ] as const;
 
-// MIT Sloan Class of 2026 cohort names.
+// Seed list for functional roles. Same add-new pattern as industries / cities
+// / activities.
+export const ROLES = [
+  "Business Analyst",
+  "Consultant",
+  "Data Scientist",
+  "Designer",
+  "Executive",
+  "Finance",
+  "Founder",
+  "Investor",
+  "Manager",
+  "Marketing",
+  "Operations",
+  "Other",
+  "Product Manager",
+  "Program Manager",
+  "Sales",
+  "Software Engineer",
+  "Strategy",
+] as const;
+
+// MIT Sloan Class of 2026 cohort names. Strict allow-list (no add-new).
 export const OCEANS = [
   "Atlantic",
   "Baltic",

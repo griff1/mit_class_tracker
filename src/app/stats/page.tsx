@@ -4,7 +4,10 @@ import { OCEANS, type Profile } from "@/lib/types";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 
-type Row = Pick<Profile, "cities" | "industries" | "activities" | "ocean">;
+type Row = Pick<
+  Profile,
+  "cities" | "industries" | "roles" | "activities" | "ocean"
+>;
 
 export default async function StatsPage() {
   const supabase = await createClient();
@@ -21,12 +24,13 @@ export default async function StatsPage() {
 
   const { data: rows } = await supabase
     .from("profiles")
-    .select("cities, industries, activities, ocean")
+    .select("cities, industries, roles, activities, ocean")
     .returns<Row[]>();
 
   const total = (rows ?? []).length;
   const cityCounts = aggregateArray(rows, "cities");
   const industryCounts = aggregateArray(rows, "industries");
+  const roleCounts = aggregateArray(rows, "roles");
   const activityCounts = aggregateArray(rows, "activities");
   const oceanCounts = aggregateScalar(rows, "ocean");
 
@@ -41,13 +45,14 @@ export default async function StatsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <StatBlock title="Top cities" rows={cityCounts.slice(0, 10)} total={total} />
         <StatBlock title="Top industries" rows={industryCounts.slice(0, 10)} total={total} />
+        <StatBlock title="Top roles" rows={roleCounts.slice(0, 10)} total={total} />
+        <StatBlock title="Top activities" rows={activityCounts.slice(0, 10)} total={total} />
         <StatBlock
           title="Oceans"
           rows={oceanCounts}
           total={total}
           ordered={OCEANS}
         />
-        <StatBlock title="Top activities" rows={activityCounts.slice(0, 10)} total={total} />
       </div>
     </AppShell>
   );
@@ -55,7 +60,7 @@ export default async function StatsPage() {
 
 function aggregateArray(
   rows: Row[] | null,
-  key: "cities" | "industries" | "activities",
+  key: "cities" | "industries" | "roles" | "activities",
 ) {
   const counts = new Map<string, number>();
   for (const r of rows ?? []) {

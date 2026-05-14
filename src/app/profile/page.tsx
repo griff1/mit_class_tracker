@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, type Profile } from "@/lib/types";
+import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES, type Profile } from "@/lib/types";
 import { updateProfile } from "./actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Section } from "@/components/section";
 import { FieldRow, ReadOnlyValue } from "@/components/field-row";
 import { Input, Select } from "@/components/inputs";
-import { Chip } from "@/components/chip";
 import { EditableChipGroup } from "@/components/editable-chip-group";
 
 export default async function ProfilePage({
@@ -45,9 +44,17 @@ export default async function ProfilePage({
     );
   }
 
-  // Pull cohort-known cities and activities to surface alongside the seed
-  // lists in the editable chip groups.
-  const { data: cohort } = await supabase.from("profiles").select("cities, activities");
+  // Pull cohort-known values to surface alongside the seed lists in the
+  // editable chip groups.
+  const { data: cohort } = await supabase
+    .from("profiles")
+    .select("industries, roles, cities, activities");
+  const knownIndustries = Array.from(
+    new Set((cohort ?? []).flatMap((r) => (r.industries as string[] | null) ?? [])),
+  );
+  const knownRoles = Array.from(
+    new Set((cohort ?? []).flatMap((r) => (r.roles as string[] | null) ?? [])),
+  );
   const knownCities = Array.from(
     new Set((cohort ?? []).flatMap((r) => (r.cities as string[] | null) ?? [])),
   );
@@ -99,17 +106,23 @@ export default async function ProfilePage({
           <FieldRow label="Title">
             <Input name="title" defaultValue={profile.title ?? ""} placeholder="Product Manager" />
           </FieldRow>
-          <FieldRow label="Industries" help="Pick all that apply.">
-            <div className="flex flex-wrap gap-1.5">
-              {INDUSTRIES.map((ind) => (
-                <Chip
-                  key={ind}
-                  name="industries"
-                  value={ind}
-                  defaultChecked={profile.industries.includes(ind)}
-                />
-              ))}
-            </div>
+          <FieldRow label="Roles" help="What you actually do day-to-day. Pick all that apply.">
+            <EditableChipGroup
+              name="roles"
+              newName="roles_new"
+              options={[...ROLES, ...knownRoles]}
+              selected={profile.roles}
+              newPlaceholder="Add a role not listed"
+            />
+          </FieldRow>
+          <FieldRow label="Industries" help="Pick all that apply, or add a new one.">
+            <EditableChipGroup
+              name="industries"
+              newName="industries_new"
+              options={[...INDUSTRIES, ...knownIndustries]}
+              selected={profile.industries}
+              newPlaceholder="Add an industry not listed"
+            />
           </FieldRow>
         </Section>
 

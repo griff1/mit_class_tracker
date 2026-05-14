@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CITIES, INDUSTRIES, OCEANS, type Profile } from "@/lib/types";
+import {
+  ACTIVITIES,
+  CITIES,
+  INDUSTRIES,
+  OCEANS,
+  ROLES,
+  type Profile,
+} from "@/lib/types";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { ProfileCard, type DirectoryRow } from "@/components/profile-card";
@@ -11,8 +18,10 @@ import { Chip } from "@/components/chip";
 type SearchParams = {
   q?: string | string[];
   industries?: string | string[];
+  roles?: string | string[];
   ocean?: string | string[];
   cities?: string | string[];
+  activities?: string | string[];
 };
 
 function single(v: string | string[] | undefined): string {
@@ -25,6 +34,17 @@ function many(v: string | string[] | undefined): string[] {
   return (Array.isArray(v) ? v : [v]).map((s) => s.trim()).filter(Boolean);
 }
 
+function unionCanonical(seed: readonly string[], cohort: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const v of [...seed, ...cohort]) {
+    const k = v.toLowerCase();
+    if (!seen.has(k)) seen.set(k, v);
+  }
+  return Array.from(seen.values()).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
+}
+
 export default async function DirectoryPage({
   searchParams,
 }: {
@@ -33,10 +53,10 @@ export default async function DirectoryPage({
   const sp = await searchParams;
   const q = single(sp.q).trim();
   const ocean = single(sp.ocean).trim();
-  const selectedIndustries = many(sp.industries).filter((s) =>
-    (INDUSTRIES as readonly string[]).includes(s),
-  );
+  const selectedIndustries = many(sp.industries);
+  const selectedRoles = many(sp.roles);
   const selectedCities = many(sp.cities);
+  const selectedActivities = many(sp.activities);
 
   const supabase = await createClient();
   const {
@@ -50,32 +70,51 @@ export default async function DirectoryPage({
     .eq("id", user.id)
     .maybeSingle<Pick<Profile, "name">>();
 
-  // Cohort-known cities — union with seed list for filter chip options.
-  const { data: cohort } = await supabase.from("profiles").select("cities");
-  const knownCities = Array.from(
-    new Set((cohort ?? []).flatMap((r) => (r.cities as string[] | null) ?? [])),
+  // Build chip options as seed ∪ cohort, deduped case-insensitively.
+  const { data: cohort } = await supabase
+    .from("profiles")
+    .select("industries, roles, cities, activities");
+  const cohortIndustries = (cohort ?? []).flatMap(
+    (r) => (r.industries as string[] | null) ?? [],
   );
-  const cityOptionSet = new Map<string, string>();
-  for (const v of [...CITIES, ...knownCities]) {
-    const k = v.toLowerCase();
-    if (!cityOptionSet.has(k)) cityOptionSet.set(k, v);
-  }
-  const cityOptions = Array.from(cityOptionSet.values()).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  const cohortRoles = (cohort ?? []).flatMap(
+    (r) => (r.roles as string[] | null) ?? [],
   );
+  const cohortCities = (cohort ?? []).flatMap(
+    (r) => (r.cities as string[] | null) ?? [],
+  );
+  const cohortActivities = (cohort ?? []).flatMap(
+    (r) => (r.activities as string[] | null) ?? [],
+  );
+  const industryOptions = unionCanonical(INDUSTRIES, cohortIndustries);
+  const roleOptions = unionCanonical(ROLES, cohortRoles);
+  const cityOptions = unionCanonical(CITIES, cohortCities);
+  const activityOptions = unionCanonical(ACTIVITIES, cohortActivities);
 
   let query = supabase
     .from("profiles")
-    .select("id, name, mit_email, company, title, industries, cities, linkedin_url, ocean")
+    .select(
+      "id, name, mit_email, company, title, industries, roles, cities, linkedin_url, ocean",
+    )
     .order("name", { ascending: true, nullsFirst: false });
 
   if (q) query = query.ilike("name", `%${q}%`);
   if (selectedIndustries.length) query = query.overlaps("industries", selectedIndustries);
-  if (ocean && (OCEANS as readonly string[]).includes(ocean)) query = query.eq("ocean", ocean);
+  if (selectedRoles.length) query = query.overlaps("roles", selectedRoles);
+  if (ocean && (OCEANS as readonly string[]).includes(ocean))
+    query = query.eq("ocean", ocean);
   if (selectedCities.length) query = query.overlaps("cities", selectedCities);
+  if (selectedActivities.length) query = query.overlaps("activities", selectedActivities);
 
   const { data: profiles, error } = await query.returns<DirectoryRow[]>();
-  const hasFilters = !!(q || ocean || selectedIndustries.length || selectedCities.length);
+  const hasFilters = !!(
+    q ||
+    ocean ||
+    selectedIndustries.length ||
+    selectedRoles.length ||
+    selectedCities.length ||
+    selectedActivities.length
+  );
 
   return (
     <AppShell active="directory" user={{ name: me?.name ?? null, email: user.email! }}>
@@ -105,32 +144,30 @@ export default async function DirectoryPage({
                 ))}
               </Select>
             </FilterGroup>
-            <FilterGroup label="Industries">
-              <div className="flex flex-wrap gap-1.5">
-                {INDUSTRIES.map((ind) => (
-                  <Chip
-                    key={ind}
-                    name="industries"
-                    value={ind}
-                    defaultChecked={selectedIndustries.includes(ind)}
-                  />
-                ))}
-              </div>
-            </FilterGroup>
-            <FilterGroup label="Cities">
-              <div className="flex flex-wrap gap-1.5">
-                {cityOptions.map((c) => (
-                  <Chip
-                    key={c}
-                    name="cities"
-                    value={c}
-                    defaultChecked={selectedCities.some(
-                      (s) => s.toLowerCase() === c.toLowerCase(),
-                    )}
-                  />
-                ))}
-              </div>
-            </FilterGroup>
+            <ChipFilter
+              label="Roles"
+              name="roles"
+              options={roleOptions}
+              selected={selectedRoles}
+            />
+            <ChipFilter
+              label="Industries"
+              name="industries"
+              options={industryOptions}
+              selected={selectedIndustries}
+            />
+            <ChipFilter
+              label="Cities"
+              name="cities"
+              options={cityOptions}
+              selected={selectedCities}
+            />
+            <ChipFilter
+              label="Activities"
+              name="activities"
+              options={activityOptions}
+              selected={selectedActivities}
+            />
             <div className="flex items-center gap-3 border-t border-dashed border-line-2 pt-3">
               <button
                 type="submit"
@@ -198,5 +235,50 @@ function FilterGroup({
       </span>
       {children}
     </div>
+  );
+}
+
+/**
+ * Collapsible chip-multi-select filter. Defaults to expanded when there are
+ * active selections (so the user sees what's applied), collapsed otherwise.
+ */
+function ChipFilter({
+  label,
+  name,
+  options,
+  selected,
+}: {
+  label: string;
+  name: string;
+  options: readonly string[];
+  selected: readonly string[];
+}) {
+  const selectedLower = new Set(selected.map((s) => s.toLowerCase()));
+  return (
+    <details className="group flex flex-col gap-1.5" open={selected.length > 0}>
+      <summary className="flex cursor-pointer list-none items-center justify-between">
+        <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-3">
+          {label}
+          {selected.length > 0 && (
+            <span className="ml-1.5 rounded-sm bg-brand-50 px-1 text-brand-700">
+              {selected.length}
+            </span>
+          )}
+        </span>
+        <span className="font-mono text-[0.6rem] text-ink-3 transition group-open:rotate-90">
+          ▸
+        </span>
+      </summary>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {options.map((opt) => (
+          <Chip
+            key={opt}
+            name={name}
+            value={opt}
+            defaultChecked={selectedLower.has(opt.toLowerCase())}
+          />
+        ))}
+      </div>
+    </details>
   );
 }
