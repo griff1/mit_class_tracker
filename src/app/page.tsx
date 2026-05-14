@@ -55,10 +55,11 @@ export default async function Home() {
 
   const { data: cityRows } = await supabase
     .from("profiles")
-    .select("city")
-    .not("city", "is", null);
+    .select("cities");
 
-  const cities = new Set((cityRows ?? []).map((r) => r.city)).size;
+  const cities = new Set(
+    (cityRows ?? []).flatMap((r) => (r.cities as string[] | null) ?? []),
+  ).size;
 
   const { data: indRows } = await supabase
     .from("profiles")
