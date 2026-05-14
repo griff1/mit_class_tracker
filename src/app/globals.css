@@ -14,13 +14,13 @@
   --color-brand-900: #5a1d11;
 
   /* Warm neutrals used in place of Tailwind's cool zinc/gray. */
-  --color-cream:   #fbf6ed;
-  --color-paper:   #fffdf8;
+  --color-cream:   #f5ecda;
+  --color-paper:   #ffffff;
   --color-ink:     #1f1814;
   --color-ink-2:   #5b4f44;
   --color-ink-3:   #8a7b6b;
-  --color-line:    #e8ddc8;
-  --color-line-2:  #d8c9ad;
+  --color-line:    #d2c19a;
+  --color-line-2:  #ad9866;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-jetbrains-mono);
