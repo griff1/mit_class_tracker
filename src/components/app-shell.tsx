@@ -36,7 +36,7 @@ export function AppShell({
             className="h-14 w-auto"
             priority
           />
-          <span className="hidden font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-3 sm:inline">
+          <span className="hidden font-mono text-[0.65rem] font-medium uppercase tracking-[0.18em] text-brand-700 sm:inline">
             Class of &apos;26
           </span>
         </Link>
