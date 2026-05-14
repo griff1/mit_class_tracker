@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { INDUSTRIES, OCEANS } from "@/lib/types";
+import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS } from "@/lib/types";
+
+type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== "string") return null;
@@ -38,6 +40,54 @@ function manyOfFromAllowed<T extends string>(
   return out;
 }
 
+/**
+ * Resolves a user-submitted set of values (chip selections + optional new
+ * write-in) against the cohort's existing canonical entries. Case-insensitive:
+ * if the new write-in matches an existing entry by lowercase, we keep the
+ * existing casing instead of introducing a duplicate.
+ *
+ * Returns a deduped array in the order: chips first, then the new value if it
+ * survived as a fresh entry.
+ */
+async function resolveCanonical(
+  supabase: ServerClient,
+  column: "cities" | "activities",
+  seed: readonly string[],
+  chips: string[],
+  newValue: string | null,
+): Promise<string[]> {
+  const { data } = await supabase.from("profiles").select(column);
+  const cohort = ((data ?? []) as Array<Record<string, unknown>>).flatMap(
+    (r) => (r[column] as string[] | null) ?? [],
+  );
+
+  // Build canonical map (lowercase key → display value). First-seen wins.
+  const canonical = new Map<string, string>();
+  for (const v of [...cohort, ...seed]) {
+    const k = v.toLowerCase();
+    if (!canonical.has(k)) canonical.set(k, v);
+  }
+
+  const result = new Map<string, string>();
+  for (const c of chips) {
+    const trimmed = c.trim();
+    if (!trimmed) continue;
+    const k = trimmed.toLowerCase();
+    const display = canonical.get(k) ?? trimmed;
+    if (!result.has(k)) result.set(k, display);
+  }
+  if (newValue) {
+    const k = newValue.toLowerCase();
+    const display = canonical.get(k) ?? newValue;
+    if (!result.has(k)) result.set(k, display);
+  }
+  return Array.from(result.values());
+}
+
+function manyStrings(values: FormDataEntryValue[]): string[] {
+  return values.filter((v): v is string => typeof v === "string");
+}
+
 export async function updateProfile(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -45,15 +95,32 @@ export async function updateProfile(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
+  const cities = await resolveCanonical(
+    supabase,
+    "cities",
+    CITIES,
+    manyStrings(formData.getAll("cities")),
+    trimOrNull(formData.get("cities_new")),
+  );
+
+  const activities = await resolveCanonical(
+    supabase,
+    "activities",
+    ACTIVITIES,
+    manyStrings(formData.getAll("activities")),
+    trimOrNull(formData.get("activities_new")),
+  );
+
   const payload = {
     name: trimOrNull(formData.get("name")),
     personal_email: trimOrNull(formData.get("personal_email")),
     company: trimOrNull(formData.get("company")),
     title: trimOrNull(formData.get("title")),
     industries: manyOfFromAllowed(formData.getAll("industries"), INDUSTRIES),
-    city: trimOrNull(formData.get("city")),
+    cities,
     linkedin_url: trimOrNull(formData.get("linkedin_url")),
     ocean: oneOfOrNull(formData.get("ocean"), OCEANS),
+    activities,
   };
 
   const { error } = await supabase

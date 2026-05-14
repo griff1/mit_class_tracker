@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { INDUSTRIES, OCEANS, type Profile } from "@/lib/types";
+import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, type Profile } from "@/lib/types";
 import { updateProfile } from "./actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -9,6 +9,7 @@ import { Section } from "@/components/section";
 import { FieldRow, ReadOnlyValue } from "@/components/field-row";
 import { Input, Select } from "@/components/inputs";
 import { Chip } from "@/components/chip";
+import { EditableChipGroup } from "@/components/editable-chip-group";
 
 export default async function ProfilePage({
   searchParams,
@@ -43,6 +44,16 @@ export default async function ProfilePage({
       />
     );
   }
+
+  // Pull cohort-known cities and activities to surface alongside the seed
+  // lists in the editable chip groups.
+  const { data: cohort } = await supabase.from("profiles").select("cities, activities");
+  const knownCities = Array.from(
+    new Set((cohort ?? []).flatMap((r) => (r.cities as string[] | null) ?? [])),
+  );
+  const knownActivities = Array.from(
+    new Set((cohort ?? []).flatMap((r) => (r.activities as string[] | null) ?? [])),
+  );
 
   return (
     <AppShell active="profile" user={{ name: profile.name, email: user.email! }}>
@@ -103,8 +114,14 @@ export default async function ProfilePage({
         </Section>
 
         <Section label="Place" index={3}>
-          <FieldRow label="City" help="City only — we don't collect addresses.">
-            <Input name="city" defaultValue={profile.city ?? ""} placeholder="New York, NY" />
+          <FieldRow label="Cities" help="Pick where you're based — multiple is fine. Add a new one if yours isn't listed.">
+            <EditableChipGroup
+              name="cities"
+              newName="cities_new"
+              options={[...CITIES, ...knownCities]}
+              selected={profile.cities}
+              newPlaceholder="Add a city not listed (e.g. Portland, OR)"
+            />
           </FieldRow>
           <FieldRow label="Ocean">
             <Select name="ocean" defaultValue={profile.ocean ?? ""}>
@@ -122,6 +139,18 @@ export default async function ProfilePage({
               type="url"
               defaultValue={profile.linkedin_url ?? ""}
               placeholder="https://www.linkedin.com/in/..."
+            />
+          </FieldRow>
+        </Section>
+
+        <Section label="Sloan" index={4}>
+          <FieldRow label="Activities" help="Clubs, competitions, fellowships — pick all that apply, or add one we don't have.">
+            <EditableChipGroup
+              name="activities"
+              newName="activities_new"
+              options={[...ACTIVITIES, ...knownActivities]}
+              selected={profile.activities}
+              newPlaceholder="Add an activity not listed"
             />
           </FieldRow>
         </Section>

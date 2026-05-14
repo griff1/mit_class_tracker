@@ -7,7 +7,7 @@ export type DirectoryRow = {
   company: string | null;
   title: string | null;
   industries: string[];
-  city: string | null;
+  cities: string[];
   linkedin_url: string | null;
   ocean: string | null;
 };
@@ -38,9 +38,9 @@ export function ProfileCard({ profile }: { profile: DirectoryRow }) {
           {displayName}
         </h2>
         {work && <p className="text-sm text-ink-2">{work}</p>}
-        {profile.city && (
+        {profile.cities.length > 0 && (
           <p className="text-xs text-ink-2 before:mr-1 before:font-mono before:text-ink-3 before:content-['—']">
-            {profile.city}
+            {profile.cities.join(" · ")}
           </p>
         )}
         {profile.industries.length > 0 && (
