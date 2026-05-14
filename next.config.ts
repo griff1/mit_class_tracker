@@ -1,5 +1,19 @@
 import type { NextConfig } from "next";
 
+const SECURITY_HEADERS = [
+  // Block framing — prevents clickjacking of the authed UI.
+  { key: "X-Frame-Options", value: "DENY" },
+  // Don't let browsers guess the MIME type of responses.
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  // Strip full URLs from cross-origin Referer headers.
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // No camera / mic / geolocation — we don't ask for them, so deny.
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
+];
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
@@ -7,6 +21,14 @@ const nextConfig: NextConfig = {
       // those silently during profile photo upload.
       bodySizeLimit: "5mb",
     },
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: SECURITY_HEADERS,
+      },
+    ];
   },
 };
 
