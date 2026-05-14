@@ -24,6 +24,20 @@ export function safeHttpUrl(v: string | null | undefined): string | null {
 }
 
 /**
+ * Server-side basic email format check. Forgiving (no RFC 5322), but enforces
+ * `localpart@domain.tld` shape so we don't store obviously malformed values.
+ * Lowercases on the way out so comparisons elsewhere don't need to re-case.
+ * Returns null if the input doesn't look like an email.
+ */
+export function safeEmail(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const s = v.trim().toLowerCase();
+  if (!s) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return null;
+  return s;
+}
+
+/**
  * Same as `safeHttpUrl`, with an additional hostname constraint: the URL
  * must be `linkedin.com` or a subdomain of it (e.g. `www.linkedin.com`,
  * `uk.linkedin.com`). The check rejects look-alike domains like

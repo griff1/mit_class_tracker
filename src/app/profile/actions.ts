@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES } from "@/lib/types";
-import { safeLinkedInUrl } from "@/lib/url-safety";
+import { safeEmail, safeLinkedInUrl } from "@/lib/url-safety";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -159,7 +159,11 @@ export async function updateProfile(formData: FormData) {
 
   const payload: Record<string, unknown> = {
     name: trimOrNull(formData.get("name")),
-    personal_email: trimOrNull(formData.get("personal_email")),
+    personal_email: safeEmail(
+      typeof formData.get("personal_email") === "string"
+        ? (formData.get("personal_email") as string)
+        : null,
+    ),
     company: trimOrNull(formData.get("company")),
     title: trimOrNull(formData.get("title")),
     industries,
