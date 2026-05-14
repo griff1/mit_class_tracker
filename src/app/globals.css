@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm coral / MIT-adjacent cardinal — primary accent. */
+  --color-brand-50: #fff3ee;
+  --color-brand-100: #ffe2d4;
+  --color-brand-200: #ffc1a4;
+  --color-brand-300: #ff9a73;
+  --color-brand-400: #f87253;
+  --color-brand-500: #e85d45;
+  --color-brand-600: #c8412c;
+  --color-brand-700: #a23420;
+  --color-brand-800: #7a2818;
+  --color-brand-900: #5a1d11;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/*
+  Light-mode only — warm cream background and warm-gray text. Tailwind's `stone`
+  palette pairs with the brand coral better than `zinc` (which has a cool cast).
+*/
+html,
+body {
+  background: var(--color-stone-50);
+  color: var(--color-stone-900);
+}
