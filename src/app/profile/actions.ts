@@ -72,12 +72,60 @@ async function resolveCanonical(
   return Array.from(result.values());
 }
 
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const PHOTO_ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
 export async function updateProfile(formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
+
+  // Optional photo upload. The file input only ships bytes when the user
+  // actually selected something; an empty File (size 0) means they didn't.
+  let photoPath: string | undefined;
+  const photoEntry = formData.get("profile_photo");
+  if (photoEntry instanceof File && photoEntry.size > 0) {
+    if (photoEntry.size > PHOTO_MAX_BYTES) {
+      redirect(
+        `/profile?error=${encodeURIComponent(
+          "Photo must be 5 MB or smaller.",
+        )}`,
+      );
+    }
+    if (!PHOTO_ALLOWED_TYPES.has(photoEntry.type)) {
+      redirect(
+        `/profile?error=${encodeURIComponent(
+          "Photo must be JPEG, PNG, WebP, or GIF.",
+        )}`,
+      );
+    }
+
+    // Single path per user — upsert overwrites the previous photo. Content
+    // type is preserved as metadata so the right MIME is served regardless
+    // of the URL extension (we don't store one).
+    const path = `${user.id}/avatar`;
+    const { error: uploadError } = await supabase.storage
+      .from("profile-photos")
+      .upload(path, photoEntry, {
+        upsert: true,
+        contentType: photoEntry.type,
+      });
+    if (uploadError) {
+      redirect(
+        `/profile?error=${encodeURIComponent(
+          `Photo upload failed: ${uploadError.message}`,
+        )}`,
+      );
+    }
+    photoPath = path;
+  }
 
   const industries = await resolveCanonical(
     supabase,
@@ -108,7 +156,7 @@ export async function updateProfile(formData: FormData) {
     trimOrNull(formData.get("activities_new")),
   );
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     name: trimOrNull(formData.get("name")),
     personal_email: trimOrNull(formData.get("personal_email")),
     company: trimOrNull(formData.get("company")),
@@ -120,6 +168,9 @@ export async function updateProfile(formData: FormData) {
     ocean: oneOfOrNull(formData.get("ocean"), OCEANS),
     activities,
   };
+  if (photoPath !== undefined) {
+    payload.profile_photo_url = photoPath;
+  }
 
   const { error } = await supabase
     .from("profiles")

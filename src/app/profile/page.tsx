@@ -9,6 +9,7 @@ import { Section } from "@/components/section";
 import { FieldRow, ReadOnlyValue } from "@/components/field-row";
 import { Input, Select } from "@/components/inputs";
 import { EditableChipGroup } from "@/components/editable-chip-group";
+import { Avatar } from "@/components/avatar";
 
 export default async function ProfilePage({
   searchParams,
@@ -62,6 +63,19 @@ export default async function ProfilePage({
     new Set((cohort ?? []).flatMap((r) => (r.activities as string[] | null) ?? [])),
   );
 
+  // Signed URL for the current photo so the form can render a preview.
+  // Paths are stored in profile_photo_url; signed URLs are generated per
+  // render with a 1-hour expiry.
+  let photoUrl: string | null = null;
+  if (profile.profile_photo_url) {
+    const { data: signed } = await supabase.storage
+      .from("profile-photos")
+      .createSignedUrl(profile.profile_photo_url, 3600);
+    photoUrl = signed?.signedUrl ?? null;
+  }
+
+  const displayName = profile.name?.trim() || profile.mit_email;
+
   return (
     <AppShell active="profile" user={{ name: profile.name, email: user.email! }}>
       <PageHeader
@@ -81,8 +95,26 @@ export default async function ProfilePage({
         </p>
       )}
 
-      <form action={updateProfile} className="flex flex-col gap-3">
+      <form
+        action={updateProfile}
+        encType="multipart/form-data"
+        className="flex flex-col gap-3"
+      >
         <Section label="Identity" index={1}>
+          <FieldRow
+            label="Photo"
+            help="Optional. JPEG / PNG / WebP / GIF, up to 5 MB. Visible to classmates."
+          >
+            <div className="flex items-center gap-4">
+              <Avatar name={displayName} size="lg" photoUrl={photoUrl} />
+              <input
+                type="file"
+                name="profile_photo"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="text-sm text-ink-2 file:mr-3 file:rounded-md file:border file:border-line file:bg-cream file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-ink hover:file:bg-paper"
+              />
+            </div>
+          </FieldRow>
           <FieldRow label="MIT email">
             <ReadOnlyValue>{profile.mit_email}</ReadOnlyValue>
           </FieldRow>

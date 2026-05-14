@@ -94,7 +94,7 @@ export default async function DirectoryPage({
   let query = supabase
     .from("profiles")
     .select(
-      "id, name, mit_email, company, title, industries, roles, cities, linkedin_url, ocean",
+      "id, name, mit_email, company, title, industries, roles, cities, linkedin_url, ocean, profile_photo_url",
     )
     .order("name", { ascending: true, nullsFirst: false });
 
@@ -107,6 +107,25 @@ export default async function DirectoryPage({
   if (selectedActivities.length) query = query.overlaps("activities", selectedActivities);
 
   const { data: profiles, error } = await query.returns<DirectoryRow[]>();
+
+  // Batch-sign photo URLs for the visible profiles (one round trip instead of
+  // N). createSignedUrls returns results in the same order as the input paths.
+  const photoPaths = (profiles ?? [])
+    .map((p) => p.profile_photo_url)
+    .filter((p): p is string => !!p);
+  const photoUrls = new Map<string, string>();
+  if (photoPaths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("profile-photos")
+      .createSignedUrls(photoPaths, 3600);
+    if (signed) {
+      for (let i = 0; i < photoPaths.length; i++) {
+        const url = signed[i]?.signedUrl;
+        if (url) photoUrls.set(photoPaths[i], url);
+      }
+    }
+  }
+
   const hasFilters = !!(
     q ||
     ocean ||
@@ -211,7 +230,15 @@ export default async function DirectoryPage({
           {profiles && profiles.length > 0 && (
             <ul className="flex flex-col gap-3">
               {profiles.map((p) => (
-                <ProfileCard key={p.id} profile={p} />
+                <ProfileCard
+                  key={p.id}
+                  profile={p}
+                  photoUrl={
+                    p.profile_photo_url
+                      ? photoUrls.get(p.profile_photo_url)
+                      : null
+                  }
+                />
               ))}
             </ul>
           )}

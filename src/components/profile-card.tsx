@@ -11,14 +11,21 @@ export type DirectoryRow = {
   cities: string[];
   linkedin_url: string | null;
   ocean: string | null;
+  profile_photo_url: string | null;
 };
 
-export function ProfileCard({ profile }: { profile: DirectoryRow }) {
+export function ProfileCard({
+  profile,
+  photoUrl,
+}: {
+  profile: DirectoryRow;
+  photoUrl?: string | null;
+}) {
   const displayName = profile.name?.trim() || profile.mit_email;
   const work = [profile.title, profile.company].filter(Boolean).join(" at ");
   return (
     <li className="grid grid-cols-[44px_1fr] gap-4 rounded-md border border-line bg-paper p-4">
-      <Avatar name={displayName} size="md" />
+      <Avatar name={displayName} size="md" photoUrl={photoUrl} />
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-ink-3">
