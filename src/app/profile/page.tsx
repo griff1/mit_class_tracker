@@ -95,11 +95,7 @@ export default async function ProfilePage({
         </p>
       )}
 
-      <form
-        action={updateProfile}
-        encType="multipart/form-data"
-        className="flex flex-col gap-3"
-      >
+      <form action={updateProfile} className="flex flex-col gap-3">
         <Section label="Identity" index={1}>
           <FieldRow
             label="Photo"

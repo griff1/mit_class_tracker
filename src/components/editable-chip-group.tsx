@@ -20,9 +20,12 @@ export function EditableChipGroup({
   name: string;
   newName: string;
   options: readonly string[];
-  selected: readonly string[];
+  selected: readonly string[] | null | undefined;
   newPlaceholder?: string;
 }) {
+  // A column whose migration hasn't been applied yet will arrive as undefined
+  // from Supabase; default to empty so the page still renders.
+  const safeSelected = selected ?? [];
   // Union of options + selected, case-insensitive, first-seen casing wins.
   // Selected values not in `options` (e.g. user's previous custom adds) still
   // render as chips so they can be unchecked.
@@ -31,14 +34,14 @@ export function EditableChipGroup({
     const k = v.toLowerCase();
     if (!seen.has(k)) seen.set(k, v);
   }
-  for (const v of selected) {
+  for (const v of safeSelected) {
     const k = v.toLowerCase();
     if (!seen.has(k)) seen.set(k, v);
   }
   const canonical = Array.from(seen.values()).sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: "base" }),
   );
-  const selectedLower = new Set(selected.map((s) => s.toLowerCase()));
+  const selectedLower = new Set(safeSelected.map((s) => s.toLowerCase()));
 
   return (
     <div className="flex flex-col gap-2.5">
