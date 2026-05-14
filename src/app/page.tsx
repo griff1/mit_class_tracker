@@ -101,8 +101,20 @@ export default async function Home() {
           title="Directory"
           description={`Search ${peopleCount ?? 0} classmates by industry, role, city.`}
         />
-        <NavTile num="03" label="Soon" title="Map" description="Where everyone landed, aggregated by city." soon />
-        <NavTile num="04" label="Soon" title="Stats" description="Top cities and industries across the cohort." soon />
+        <NavTile
+          num="03"
+          label="Visualize"
+          href="/map"
+          title="Map"
+          description="Where everyone landed, aggregated by city."
+        />
+        <NavTile
+          num="04"
+          label="Aggregate"
+          href="/stats"
+          title="Stats"
+          description="Top cities, industries, and activities across the cohort."
+        />
       </nav>
     </AppShell>
   );

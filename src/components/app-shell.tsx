@@ -7,8 +7,8 @@ type SectionKey = "home" | "directory" | "map" | "stats" | "profile";
 const SECTIONS: { key: SectionKey; href: string; label: string; available: boolean }[] = [
   { key: "home", href: "/", label: "Home", available: true },
   { key: "directory", href: "/directory", label: "Directory", available: true },
-  { key: "map", href: "#", label: "Map", available: false },
-  { key: "stats", href: "#", label: "Stats", available: false },
+  { key: "map", href: "/map", label: "Map", available: true },
+  { key: "stats", href: "/stats", label: "Stats", available: true },
   { key: "profile", href: "/profile", label: "Profile", available: true },
 ];
 
