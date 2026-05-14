@@ -25,19 +25,17 @@ export default async function Home() {
             and keeping the cohort connected after graduation.
           </p>
         </header>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-2">
           <Link
             href="/sign-in"
-            className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-cream transition hover:bg-ink-2"
+            className="self-start rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-cream transition hover:bg-ink-2"
           >
             Sign in
           </Link>
-          <Link
-            href="/sign-up"
-            className="rounded-md border border-line-2 bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:border-brand-400"
-          >
-            Sign up
-          </Link>
+          <p className="text-xs text-ink-3">
+            New here? Same button — we&apos;ll create your account from your{" "}
+            <code className="font-mono">@mit.edu</code> address.
+          </p>
         </div>
       </main>
     );

@@ -3,44 +3,34 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const MIT_DOMAIN = "@mit.edu";
+export async function requestMagicLink(formData: FormData) {
+  const email = String(formData.get("email") ?? "")
+    .toLowerCase()
+    .trim();
 
-export async function signIn(formData: FormData) {
-  const email = String(formData.get("email") ?? "").toLowerCase().trim();
-  const password = String(formData.get("password") ?? "");
-
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) {
-    redirect(`/sign-in?error=${encodeURIComponent(error.message)}`);
-  }
-  redirect("/");
-}
-
-export async function signUp(formData: FormData) {
-  const email = String(formData.get("email") ?? "").toLowerCase().trim();
-  const password = String(formData.get("password") ?? "");
-
-  // First line of domain enforcement. The auth hook in the DB is the second.
-  if (!email.endsWith(MIT_DOMAIN)) {
-    redirect(
-      `/sign-up?error=${encodeURIComponent("Sign-up is restricted to @mit.edu email addresses.")}`,
-    );
+  if (!email) {
+    redirect(`/sign-in?error=${encodeURIComponent("Email is required.")}`);
   }
 
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { error } = await supabase.auth.signUp({
+
+  // signInWithOtp covers both sign-up and sign-in:
+  //   - New email → auth.users is created (gated by the before_user_created
+  //     hook, which rejects non-@mit.edu addresses with a clear message)
+  //   - Existing user → magic link is sent to whatever auth.users.email is
+  //     currently set to (which may differ from their original MIT email if
+  //     they've gone through the alumni email transition).
+  const { error } = await supabase.auth.signInWithOtp({
     email,
-    password,
     options: { emailRedirectTo: `${siteUrl}/auth/confirm` },
   });
 
   if (error) {
-    redirect(`/sign-up?error=${encodeURIComponent(error.message)}`);
+    redirect(`/sign-in?error=${encodeURIComponent(error.message)}`);
   }
-  redirect("/sign-up?check=email");
+
+  redirect("/sign-in?check=email");
 }
 
 export async function signOut() {

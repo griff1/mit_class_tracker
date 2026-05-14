@@ -30,6 +30,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      // Sign-up and sign-in collapsed under magic-link auth — same form
+      // handles both flows. Preserve the old URL for any existing bookmarks.
+      { source: "/sign-up", destination: "/sign-in", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;
