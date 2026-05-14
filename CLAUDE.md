@@ -141,6 +141,29 @@ Light-mode only. Cool zinc/gray and pure black/white are deliberately avoided in
 5. Authentication → URL Configuration: set Site URL and add `/auth/confirm` to Additional Redirect URLs for every environment (localhost, Vercel preview, Vercel prod).
 6. Authentication → Sign In/Up: confirm "Confirm email" is on (default).
 
+## Deploying to Vercel
+
+Run through this once when wiring the GitHub repo to a Vercel project, then revisit when adding new environments (preview branches, staging, etc.).
+
+1. **Local sanity** — `npm run build` succeeds locally. If it doesn't, Vercel won't either, and the failure mode there is slower to debug.
+2. **Push to GitHub**, then in Vercel: New Project → import the repo. Framework auto-detects as Next.js; no extra build config needed.
+3. **Environment variables** (Vercel → Project Settings → Environment Variables). Set per-environment as noted:
+   - `NEXT_PUBLIC_SUPABASE_URL` — same value in **all three** environments (Production / Preview / Development).
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — same value in all three.
+   - `NEXT_PUBLIC_SITE_URL` — **must differ per env** because it's the base for email-confirmation redirects:
+     - Production: `https://<your-domain>` (no trailing slash)
+     - Preview: leave unset and add a tiny shim that reads `process.env.VERCEL_URL` at runtime, OR just set the canonical preview URL and accept that branch previews will redirect to the canonical one
+     - Development: `http://localhost:3000` (same as `.env.local`)
+   - Note: if the project was provisioned via the **Vercel Marketplace Supabase integration** (check Project Settings → Integrations), the two `NEXT_PUBLIC_SUPABASE_*` vars are injected automatically — you only need to set `NEXT_PUBLIC_SITE_URL` manually.
+4. **Update Supabase Authentication → URL Configuration** to know about the production domain:
+   - **Site URL**: the production Vercel URL (e.g. `https://classof26.vercel.app`)
+   - **Additional Redirect URLs**: add `https://<prod-domain>/auth/confirm`. To also support preview branches, add a wildcard pattern like `https://*-<vercel-team-slug>.vercel.app/auth/confirm` (Supabase supports `*` in redirect entries). Keep `http://localhost:3000/auth/confirm` in the list for local dev.
+   - Without this, the confirmation email link returns "URL not allowed" and signups deadlock at the check-your-email screen.
+5. **Migrations** apply to the same Supabase project the deployed app points at — there's no separate prod DB to migrate. If you ever clone for a staging environment, repeat the entire Bootstrap checklist on the new Supabase project.
+6. **First deploy** — push to `main`. Vercel builds, deploys, gives a URL. Sign up with a fresh `@mit.edu`, confirm via email, walk through `/profile` → `/directory` → `/map` → `/stats`. If the confirmation email lands you on `/sign-in?error=...`, that's almost always step 4 (redirect URL not whitelisted).
+7. **(Optional) Custom domain** — Project Settings → Domains → add. After it's verified, update the `NEXT_PUBLIC_SITE_URL` Production env var AND the Supabase Site URL to the custom domain. Trigger a redeploy to pick up the new env var.
+8. **(Optional) Email template polish** — Supabase Dashboard → Authentication → Email Templates → "Confirm signup". Replace the default link with `<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/">` to skip the Supabase verify endpoint round-trip and avoid the brief Supabase URL flash in the browser. Our handler already supports both flows.
+
 ## Next.js 16 quirks
 
 These will bite if you write from training-data memory of v14/v15:
