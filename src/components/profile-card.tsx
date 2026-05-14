@@ -52,29 +52,35 @@ export function ProfileCard({
             {profile.cities.join(" · ")}
           </p>
         )}
-        {(profile.roles.length > 0 ||
-          profile.industries.length > 0 ||
-          profile.activities.length > 0) && (
+        {profile.roles.length > 0 && (
           <ul className="mt-1 flex flex-wrap gap-1.5">
             {profile.roles.map((r) => (
               <li
-                key={`r-${r}`}
+                key={r}
                 className="rounded-sm border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] lowercase text-brand-700"
               >
                 {r}
               </li>
             ))}
+          </ul>
+        )}
+        {profile.industries.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
             {profile.industries.map((ind) => (
               <li
-                key={`i-${ind}`}
+                key={ind}
                 className="rounded-sm border border-line px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] lowercase text-ink-2"
               >
                 {ind}
               </li>
             ))}
+          </ul>
+        )}
+        {profile.activities.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
             {profile.activities.map((act) => (
               <li
-                key={`a-${act}`}
+                key={act}
                 className="rounded-sm border border-dashed border-line-2 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] lowercase text-ink-3"
               >
                 {act}
