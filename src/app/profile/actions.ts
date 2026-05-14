@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES } from "@/lib/types";
+import { safeHttpUrl } from "@/lib/url-safety";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -164,7 +165,11 @@ export async function updateProfile(formData: FormData) {
     industries,
     roles,
     cities,
-    linkedin_url: trimOrNull(formData.get("linkedin_url")),
+    linkedin_url: safeHttpUrl(
+      typeof formData.get("linkedin_url") === "string"
+        ? (formData.get("linkedin_url") as string)
+        : null,
+    ),
     ocean: oneOfOrNull(formData.get("ocean"), OCEANS),
     activities,
   };
