@@ -12,6 +12,7 @@ export type DirectoryRow = {
   linkedin_url: string | null;
   ocean: string | null;
   profile_photo_url: string | null;
+  activities: string[];
 };
 
 export function ProfileCard({
@@ -51,7 +52,9 @@ export function ProfileCard({
             {profile.cities.join(" · ")}
           </p>
         )}
-        {(profile.roles.length > 0 || profile.industries.length > 0) && (
+        {(profile.roles.length > 0 ||
+          profile.industries.length > 0 ||
+          profile.activities.length > 0) && (
           <ul className="mt-1 flex flex-wrap gap-1.5">
             {profile.roles.map((r) => (
               <li
@@ -67,6 +70,14 @@ export function ProfileCard({
                 className="rounded-sm border border-line px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] lowercase text-ink-2"
               >
                 {ind}
+              </li>
+            ))}
+            {profile.activities.map((act) => (
+              <li
+                key={`a-${act}`}
+                className="rounded-sm border border-dashed border-line-2 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] lowercase text-ink-3"
+              >
+                {act}
               </li>
             ))}
           </ul>
