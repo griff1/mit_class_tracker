@@ -93,12 +93,22 @@ If a query returns empty or an insert silently fails at the API layer, start her
 
 ## Design tokens
 
-Light-mode only. Cool zinc and pure black/white are deliberately avoided in favor of warmer tones.
+Light-mode only. Cool zinc/gray and pure black/white are deliberately avoided in favor of warm tones plus a single coral accent.
 
-- **Neutrals**: Tailwind's `stone` palette (`bg-stone-50` page, `bg-white` cards, `text-stone-900` headings, `text-stone-600` body, `border-stone-200`). Don't use `zinc` or `gray` — they read cool against the brand color.
-- **Brand**: custom `--color-brand-{50..900}` palette (warm coral, MIT-adjacent cardinal), defined in `src/app/globals.css` via Tailwind v4's `@theme` block. Primary CTAs are `bg-brand-500` → `hover:bg-brand-600`; accent links/eyebrows are `text-brand-700`; soft tinted backgrounds are `bg-brand-50`.
-- **Status**: `border-red-200 bg-red-50 text-red-800` for errors; `border-emerald-200 bg-emerald-50 text-emerald-800` for success.
-- **No `dark:` variants** anywhere. If we add dark mode later, do it via a class-toggled theme, not OS preference — the warm palette doesn't translate to a dark surface trivially.
+- **Color tokens** — defined in `src/app/globals.css` via Tailwind v4's `@theme` block. Generated utilities:
+  - `bg-cream` / `bg-paper` — page bg and card surface (warm off-whites)
+  - `text-ink`, `text-ink-2`, `text-ink-3` — primary / secondary / tertiary text (warm dark-to-mid)
+  - `border-line`, `border-line-2` — hairline rules
+  - `brand-{50..900}` — coral accent (CTAs, eyebrows, hover, active underline)
+- **Don't use** `zinc`, `gray`, `stone`, `slate`, `neutral`, or `bg-white`/`bg-black`/`text-black`/`text-white` directly. Always reach for the tokens above. The exception is `red-200`/`red-50`/`red-800` for error banners and `emerald-200`/`emerald-50`/`emerald-800` for success — those are intentionally cool to read as system-state alerts.
+- **Typography** — Geist Sans (`font-sans`) for body and headings. JetBrains Mono (`font-mono`) for eyebrows above headings, field labels, section labels, chip text, brand logo, and numeric counts. Mono is what makes the system feel "documented."
+- **Type sizes** — page H1 `text-2xl font-semibold tracking-tight`; card/section heading `text-base font-semibold tracking-tight`; mono labels `text-[0.6rem] uppercase tracking-[0.12em]` (or `[0.15em]`/`[0.18em]` for stronger emphasis); body `text-sm`.
+- **Radii** — cards/sections `rounded-md` (6px); avatars `rounded-md`; chips/pills `rounded-sm`; buttons `rounded-md`. No `rounded-full` or `rounded-xl` anywhere — they read too soft for the documented feel.
+- **Borders, not shadows.** All elevated surfaces are `border border-line` on `bg-paper`. No `shadow-*` utilities.
+- **Active button is `bg-ink`** with `text-cream`. Outline button is `border-line-2 bg-paper`. Coral is the accent, not the primary CTA color — it shows up on eyebrows, active-link underlines, the chip-checked state, and the avatar notch.
+- **Components** — shared primitives live in `src/components/` (`AppShell`, `PageHeader`, `Section`, `FieldRow`, `Input`/`Select`/`ReadOnlyValue`, `Chip`, `Avatar`, `ProfileCard`). Always compose new pages from these rather than re-styling raw HTML.
+- **Chip filters are JS-less.** Each chip is a `<label>` wrapping a hidden checkbox plus a styled `<span>` that toggles via `peer-checked:`. This lets the directory's GET-form filter UI survive without client JS. Use `<Chip>` for any multi-select control.
+- **No `dark:` variants** anywhere. If we add dark mode later, do it via a class-toggled theme, not OS preference.
 
 ## Bootstrap checklist (fresh Supabase project)
 
