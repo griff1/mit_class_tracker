@@ -5,6 +5,7 @@ export type DirectoryRow = {
   id: string;
   name: string | null;
   mit_email: string;
+  personal_email: string | null;
   company: string | null;
   title: string | null;
   industries: string[];
@@ -50,6 +51,22 @@ export function ProfileCard({
           {displayName}
         </h2>
         {work && <p className="text-sm text-ink-2">{work}</p>}
+        <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+          <a
+            href={`mailto:${profile.mit_email}`}
+            className="font-mono text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"
+          >
+            {profile.mit_email}
+          </a>
+          {profile.personal_email && (
+            <a
+              href={`mailto:${profile.personal_email}`}
+              className="font-mono text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"
+            >
+              {profile.personal_email}
+            </a>
+          )}
+        </p>
         {profile.cities.length > 0 && (
           <p className="text-xs text-ink-2 before:mr-1 before:font-mono before:text-ink-3 before:content-['—']">
             {profile.cities.join(" · ")}

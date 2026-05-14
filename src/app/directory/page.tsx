@@ -90,7 +90,7 @@ export default async function DirectoryPage({
   let query = supabase
     .from("profiles")
     .select(
-      "id, name, mit_email, company, title, industries, roles, cities, linkedin_url, ocean, profile_photo_url, activities",
+      "id, name, mit_email, personal_email, company, title, industries, roles, cities, linkedin_url, ocean, profile_photo_url, activities",
     )
     .order("name", { ascending: true, nullsFirst: false });
 
