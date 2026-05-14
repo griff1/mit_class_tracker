@@ -89,19 +89,18 @@ These were locked in after a pre-public-deploy review. Don't regress them silent
 
 1. **Auth** — Supabase email auth + MIT-domain check + email confirmation required.
 2. **Profile** — view-and-edit screen covering every field above. Photo upload to Supabase Storage.
-3. **Map** — markers aggregated by `cities`, one per city, count-labeled. `react-leaflet` with free tiles is a fine default; reach for Mapbox only if styling needs it.
+3. **Map** — embedded on the signed-in home page (not a separate route). Markers aggregated by `cities`, one per city, count-labeled. Uses `react-leaflet` with OpenStreetMap tiles.
 4. **Directory** — filterable/searchable table. Filters: industries, cities, ocean, name search.
 5. **Stats** — top cities, top industries, breakdowns by ocean, etc.
 
 ## Layout
 
-- `src/app/page.tsx` — auth-aware home (logged-out → marketing/CTAs; logged-in → nav cards to feature areas + sign-out)
+- `src/app/page.tsx` — auth-aware home. Logged-out: marketing CTA. Logged-in: PageHeader + stats strip + **embedded class map** (was a separate `/map` route until we collapsed it) + nav tiles to Profile / Directory / Stats. `/map` redirects to `/` via `next.config.ts`.
 - `src/app/sign-in/page.tsx` — single magic-link form (handles both new signups and returning sign-ins). `/sign-up` redirects here via `next.config.ts`.
 - `src/app/profile/page.tsx` — view-and-edit your own profile (auth-gated, redirects to sign-in). Four numbered sections: Identity / Work / Place (cities, ocean, LinkedIn) / Sloan (activities).
 - `src/app/profile/actions.ts` — `updateProfile` Server Action. `ocean` is allow-listed (no add-new). `industries`, `roles`, `cities`, `activities` all go through `resolveCanonical` — server-side case-insensitive dedup against the cohort's existing values plus the seed list, so user write-ins canonicalize to existing entries instead of duplicating. Also handles the optional `profile_photo` File entry: validates size (≤5MB) + MIME (jpeg/png/webp/gif), upserts to `profile-photos/<user_id>/avatar`, stores the path on the row.
 - `src/app/directory/page.tsx` — auth-gated class directory. Filters in URL search params (bookmarkable): name (`ilike`), ocean (`eq`), and `industries` / `roles` / `cities` / `activities` (Postgres array `overlaps`). Plain GET form so back/forward and JS-disabled both work. The four array-filter groups are collapsible via `<details>` — they default to closed and auto-open when the URL has active selections so the user sees what's applied.
-- `src/app/map/page.tsx` — auth-gated map view. Server-aggregates `profiles.cities` → counts, joins to `CITY_COORDS`, renders the leaflet map. Cities without coordinates surface in a `<details>` disclosure (with a hint to add them to `lib/cities-geo.ts`).
-- `src/app/stats/page.tsx` — auth-gated stats grid: top 10 cities / top 10 industries / oceans (full ordered list including zeros) / top 10 activities. JS-side aggregation from one Supabase query; thin coral bars rendered with plain CSS (no chart library).
+- `src/app/stats/page.tsx` — auth-gated stats grid: top 10 cities / top 10 industries / top 10 roles / top 10 activities / oceans (full ordered list including zeros). JS-side aggregation from one Supabase query; thin coral bars rendered with plain CSS (no chart library). (Map aggregation now lives in `page.tsx` — same pattern.)
 - `src/components/class-map.tsx` — **Client Component** (`"use client"`) wrapping `react-leaflet`. Renders a `MapContainer` with OpenStreetMap tiles and a custom `divIcon` per city (coral circle sized by count, popup on click). Imports `leaflet/dist/leaflet.css` at the module level. **Don't add `dynamic({ ssr: false })` around this from a Server Component** — Next 16 rejects that combination. Direct import works because the `"use client"` boundary already excludes the module from server execution.
 - `src/lib/cities-geo.ts` — lat/lng lookup keyed by lowercased city name. Only the seed `CITIES` are populated; user-added cities won't appear on the map unless their coordinates are added here.
 - `src/components/editable-chip-group.tsx` — pairs a `Chip` multi-select with a "add new" `Input` for the same field. Used for cities and activities on the profile page.
