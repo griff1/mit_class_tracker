@@ -33,8 +33,9 @@ A single `profiles` table keyed by `auth.users.id`:
 | `mit_email` | the auth identity; populated from `auth.users.email` on signup; `@mit.edu`-only |
 | `personal_email` | optional secondary contact, any domain, user-editable, **not** used for auth |
 | `company`, `title` | professional info |
-| `industries` | `text[]`, multi-select from a curated list (`INDUSTRIES` in `lib/types.ts`); GIN-indexed for `&&`/`@>` filters |
-| `cities` | `text[]`, multi-select with **canonical case-insensitive dedup** at write time (see `resolveCanonical` in `src/app/profile/actions.ts`). Seeded with `CITIES` in `lib/types.ts`; members can add new entries which then appear as chips for everyone in the cohort. GIN-indexed. The map will aggregate on this. |
+| `industries` | `text[]`, multi-select. Seed in `INDUSTRIES` (`lib/types.ts`); same add-new + `resolveCanonical` dedup pattern as cities/activities/roles. GIN-indexed. |
+| `roles` | `text[]`, multi-select of functional roles ("Product Manager", "Software Engineer", etc.). Seed in `ROLES`. Add-new + canonical dedup. GIN-indexed. Shown on profile cards as coral-tinted chips, distinct from the line-bordered industry chips. |
+| `cities` | `text[]`, multi-select with **canonical case-insensitive dedup** at write time (see `resolveCanonical` in `src/app/profile/actions.ts`). Seeded with `CITIES` in `lib/types.ts`; members can add new entries which then appear as chips for everyone in the cohort. GIN-indexed. The map aggregates on this. |
 | `linkedin_url` | LinkedIn profile URL |
 | `profile_photo_url` | Supabase Storage path/signed URL |
 | `ocean` | Sloan cohort (see glossary) |
@@ -80,8 +81,8 @@ If a query returns empty or an insert silently fails at the API layer, start her
 - `src/app/page.tsx` — auth-aware home (logged-out → marketing/CTAs; logged-in → nav cards to feature areas + sign-out)
 - `src/app/sign-in/page.tsx`, `src/app/sign-up/page.tsx` — auth forms posting to Server Actions
 - `src/app/profile/page.tsx` — view-and-edit your own profile (auth-gated, redirects to sign-in). Four numbered sections: Identity / Work / Place (cities, ocean, LinkedIn) / Sloan (activities).
-- `src/app/profile/actions.ts` — `updateProfile` Server Action. `industries`/`ocean` are allow-listed against the curated lists in `lib/types.ts`. `cities`/`activities` go through `resolveCanonical` — a server-side case-insensitive dedup against the cohort's existing values plus the seed list, so user write-ins canonicalize to existing entries instead of duplicating.
-- `src/app/directory/page.tsx` — auth-gated class directory. Filters in URL search params (bookmarkable): name (`ilike`), industries / cities (Postgres array `overlaps`), ocean (`eq`). Plain GET form so back/forward and JS-disabled both work.
+- `src/app/profile/actions.ts` — `updateProfile` Server Action. `ocean` is allow-listed (no add-new). `industries`, `roles`, `cities`, `activities` all go through `resolveCanonical` — server-side case-insensitive dedup against the cohort's existing values plus the seed list, so user write-ins canonicalize to existing entries instead of duplicating.
+- `src/app/directory/page.tsx` — auth-gated class directory. Filters in URL search params (bookmarkable): name (`ilike`), ocean (`eq`), and `industries` / `roles` / `cities` / `activities` (Postgres array `overlaps`). Plain GET form so back/forward and JS-disabled both work. The four array-filter groups are collapsible via `<details>` — they default to closed and auto-open when the URL has active selections so the user sees what's applied.
 - `src/app/map/page.tsx` — auth-gated map view. Server-aggregates `profiles.cities` → counts, joins to `CITY_COORDS`, renders the leaflet map. Cities without coordinates surface in a `<details>` disclosure (with a hint to add them to `lib/cities-geo.ts`).
 - `src/app/stats/page.tsx` — auth-gated stats grid: top 10 cities / top 10 industries / oceans (full ordered list including zeros) / top 10 activities. JS-side aggregation from one Supabase query; thin coral bars rendered with plain CSS (no chart library).
 - `src/components/class-map.tsx` — **Client Component** (`"use client"`) wrapping `react-leaflet`. Renders a `MapContainer` with OpenStreetMap tiles and a custom `divIcon` per city (coral circle sized by count, popup on click). Imports `leaflet/dist/leaflet.css` at the module level. **Don't add `dynamic({ ssr: false })` around this from a Server Component** — Next 16 rejects that combination. Direct import works because the `"use client"` boundary already excludes the module from server execution.
@@ -92,7 +93,7 @@ If a query returns empty or an insert silently fails at the API layer, start her
 - `src/lib/supabase/client.ts` — browser Supabase client for Client Components
 - `src/lib/supabase/server.ts` — server Supabase client (Server Components / Route Handlers / Server Actions); awaits `cookies()`
 - `src/lib/supabase/proxy.ts` — `updateSession` helper that refreshes auth cookies on every request
-- `src/lib/types.ts` — `Profile` row shape + curated `INDUSTRIES`, `OCEANS`, `CITIES`, `ACTIVITIES` seed lists. `INDUSTRIES` and `OCEANS` are strict allow-lists (server rejects anything outside); `CITIES` and `ACTIVITIES` are seeds — write-ins are allowed and resolved against existing cohort values for canonical casing.
+- `src/lib/types.ts` — `Profile` row shape + seed lists for `INDUSTRIES`, `ROLES`, `OCEANS`, `CITIES`, `ACTIVITIES`. **`OCEANS` is the only strict allow-list** (the cohort name is a fixed set the user can't extend). The other four are seeds — write-ins allowed, canonicalized server-side.
 - `src/proxy.ts` — Next.js 16 Proxy entry (was `middleware.ts` in v15 and earlier); delegates to `updateSession`
 - `supabase/migrations/*.sql` — versioned schema and Auth Hook function. Apply via `supabase db push`, or paste into Dashboard → SQL Editor in filename order.
 - `.env.example` — template for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`. Copy to `.env.local`.
