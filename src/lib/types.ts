@@ -20,7 +20,7 @@ export const INDUSTRIES = [
   "Consulting",
   "Healthcare",
   "Energy",
-  "Government / Public Sector",
+  "Government",
   "Nonprofit",
   "Education",
   "Retail / Consumer",
