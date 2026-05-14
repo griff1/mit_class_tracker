@@ -22,3 +22,24 @@ export function safeHttpUrl(v: string | null | undefined): string | null {
     return null;
   }
 }
+
+/**
+ * Same as `safeHttpUrl`, with an additional hostname constraint: the URL
+ * must be `linkedin.com` or a subdomain of it (e.g. `www.linkedin.com`,
+ * `uk.linkedin.com`). The check rejects look-alike domains like
+ * `evilinkedin.com` by requiring the host to be `linkedin.com` exactly or
+ * end in `.linkedin.com`.
+ */
+export function safeLinkedInUrl(v: string | null | undefined): string | null {
+  const normalized = safeHttpUrl(v);
+  if (!normalized) return null;
+  try {
+    const host = new URL(normalized).hostname.toLowerCase();
+    if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) {
+      return null;
+    }
+    return normalized;
+  } catch {
+    return null;
+  }
+}

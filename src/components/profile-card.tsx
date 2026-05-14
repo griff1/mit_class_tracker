@@ -1,5 +1,5 @@
 import { Avatar } from "@/components/avatar";
-import { safeHttpUrl } from "@/lib/url-safety";
+import { safeLinkedInUrl } from "@/lib/url-safety";
 
 export type DirectoryRow = {
   id: string;
@@ -25,9 +25,8 @@ export function ProfileCard({
 }) {
   const displayName = profile.name?.trim() || profile.mit_email;
   const work = [profile.title, profile.company].filter(Boolean).join(" at ");
-  // Defense in depth: even if a `javascript:` URL slipped past server-side
-  // validation, don't render it as an `href`.
-  const linkedinHref = safeHttpUrl(profile.linkedin_url);
+  // Defense in depth: re-validate scheme + linkedin.com hostname at render.
+  const linkedinHref = safeLinkedInUrl(profile.linkedin_url);
   return (
     <li className="grid grid-cols-[44px_1fr] gap-4 rounded-md border border-line bg-paper p-4">
       <Avatar name={displayName} size="md" photoUrl={photoUrl} />

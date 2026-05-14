@@ -182,7 +182,7 @@ export default async function ProfilePage({
               ))}
             </Select>
           </FieldRow>
-          <FieldRow label="LinkedIn">
+          <FieldRow label="LinkedIn" help="Must be a linkedin.com URL. Other URLs are dropped on save.">
             <Input
               name="linkedin_url"
               type="url"
