@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 import { Avatar } from "@/components/avatar";
@@ -26,11 +27,18 @@ export function AppShell({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-6">
       <nav className="flex items-center justify-between rounded-md border border-line bg-paper px-4 py-2.5">
-        <Link href="/" className="flex items-baseline gap-2">
-          <span className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-brand-700">
-            Sloan&apos;26
+        <Link href="/" className="flex items-center gap-3">
+          <Image
+            src="/mit-sloan-logo.png"
+            alt="MIT Sloan"
+            width={3300}
+            height={2550}
+            className="h-10 w-auto"
+            priority
+          />
+          <span className="hidden font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-3 sm:inline">
+            Class of &apos;26
           </span>
-          <span className="text-sm font-semibold tracking-tight text-ink">Directory</span>
         </Link>
         <ul className="flex items-center gap-5 text-sm">
           {SECTIONS.map((s) => {
