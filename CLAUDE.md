@@ -18,7 +18,7 @@ A private directory app for the **MIT Sloan Class of 2026** to keep track of one
 
 Cross-cutting rules every feature must preserve.
 
-- **`@mit.edu`-only auth.** Signup/login is restricted to `@mit.edu` addresses (not `@sloan.mit.edu`, not aliases). Enforce server-side via a Supabase Auth Hook (`before_user_created`) so a malicious client can't bypass it. Use the email-confirmation flow so we verify both domain *and* ownership. The MIT email is the user's auth identity and is immutable from the user's perspective — to change it they'd have to re-register. Users can additionally set a separate optional `personal_email` (any domain) for post-grad contact; that field is profile data only and is **not** used for auth.
+- **`@mit.edu`-only auth.** Signup/login is restricted to `@mit.edu` addresses (not `@sloan.mit.edu`, not aliases). Enforce server-side via a Supabase Auth Hook (`before_user_created`) so a malicious client can't bypass it. Use the email-confirmation flow so we verify both domain *and* ownership. The MIT email is the user's auth identity and is immutable from the user's perspective — to change it they'd have to re-register. Users can additionally set a separate optional `personal_email` (any domain) for post-grad contact; that field is profile data only and is **not** used for auth. **Scope note:** there is no Sloan-specific email domain, so `@mit.edu` is the finest granularity we can enforce technically. Any active MIT email (alum, faculty, current students, other classes) can register. If finer scope ever becomes a requirement, the right shape is an invite-list table that the Auth Hook checks against.
 - **All data sits behind auth, enforced at the database.** Every read of profile data flows through an authenticated session. Use Supabase **RLS** policies as the source of truth — never rely on client-side route gating alone. This is the easiest invariant to silently break.
 - **City-level location only.** We store the user-typed city string and aggregate on it. We do **not** collect street addresses or geolocate users. The map shows one marker per city, sized/labeled by count (e.g. "NYC — 12").
 - **Self-service profile editing.** Any user can update their own row at any time. There is no admin-edit path.
@@ -63,6 +63,20 @@ These project-level dashboard settings are already applied:
 2. Write at least one `CREATE POLICY` for each operation you want allowed.
 
 If a query returns empty or an insert silently fails at the API layer, start here.
+
+## Security postures
+
+These were locked in after a pre-public-deploy review. Don't regress them silently:
+
+- **Email domain gate is two-layered.** Both the `signUp` Server Action and the `before_user_created` Auth Hook check `endsWith("@mit.edu")` after lowercasing. Bypassing one still hits the other.
+- **Profile rows only exist for confirmed users.** The `on_auth_user_confirmed` trigger fires only on `email_confirmed_at` NULL→non-NULL.
+- **`/auth/confirm` `next` redirect is restricted to same-origin paths.** `safeNext` in the route handler rejects anything that doesn't start with `/`, plus protocol-relative `//`. Without this, `new URL(next, request.url)` silently drops the base when `next` is absolute — an open-redirect hole.
+- **User-supplied URLs go through `safeHttpUrl` / `safeLinkedInUrl` in `src/lib/url-safety.ts`** before being saved AND before being rendered as `href`. `safeLinkedInUrl` also constrains the host to `linkedin.com` or a subdomain to block `evilinkedin.com`-style look-alikes. Defense in depth: even if a legacy bad row exists in the DB, the render-time guard prevents `javascript:` execution.
+- **Profile-photo bucket has DB-level constraints**: 5MB file size + image-only MIME types (jpeg / png / webp / gif). The Server Action also validates, but the bucket constraint catches direct-`supabase-js` uploads that skip our action.
+- **Storage RLS only allows writes to your own `<user_id>/` folder** via `(storage.foldername(name))[1] = auth.uid()::text`. Reads are intra-cohort visible (authenticated only).
+- **Security headers in `next.config.ts`**: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=() microphone=() geolocation=()`. Apply to every route via `source: "/(.*)"`. A strict CSP is deliberately not set yet — it'd need to allow leaflet tiles + Supabase signed URLs, which is its own audit.
+- **All Supabase queries are parameterized** (no string interpolation in code). Don't introduce raw SQL via the client.
+- **The service-role key is never present in the codebase or env.** All server-side operations use the anon-key client with the user's session cookies, so RLS still applies.
 
 ## Glossary
 
