@@ -94,6 +94,7 @@ If a query returns empty or an insert silently fails at the API layer, start her
 - `src/lib/supabase/server.ts` — server Supabase client (Server Components / Route Handlers / Server Actions); awaits `cookies()`
 - `src/lib/supabase/proxy.ts` — `updateSession` helper that refreshes auth cookies on every request
 - `src/lib/types.ts` — `Profile` row shape + seed lists for `INDUSTRIES`, `ROLES`, `OCEANS`, `CITIES`, `ACTIVITIES`. **`OCEANS` is the only strict allow-list** (the cohort name is a fixed set the user can't extend). The other four are seeds — write-ins allowed, canonicalized server-side.
+- `src/lib/viewer.ts` — `getViewer(supabase, user)` loads the data the AppShell top nav needs (name, ocean, signed photo URL) for the current user. One profile-row query + one optional Storage signed-URL call. Every authed page calls this and hands the result to `<AppShell user={viewer}>`.
 - `src/proxy.ts` — Next.js 16 Proxy entry (was `middleware.ts` in v15 and earlier); delegates to `updateSession`
 - `supabase/migrations/*.sql` — versioned schema and Auth Hook function. Apply via `supabase db push`, or paste into Dashboard → SQL Editor in filename order.
 - `.env.example` — template for `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`. Copy to `.env.local`.
