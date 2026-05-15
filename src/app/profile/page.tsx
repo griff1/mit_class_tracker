@@ -114,6 +114,16 @@ export default async function ProfilePage({
         </p>
       )}
 
+      {/*
+        Transition form is declared SEPARATELY from the main updateProfile
+        form, so pressing Enter in any text input in the main form doesn't
+        accidentally submit the email-change action (browsers use the first
+        submit button as the implicit-submit target). The button below uses
+        `form="transition-auth-email"` to associate itself with this form
+        despite being visually nested inside the main form.
+      */}
+      <form id="transition-auth-email" action={transitionAuthEmail} />
+
       <form action={updateProfile} className="flex flex-col gap-3">
         <Section label="Identity" index={1}>
           <FieldRow
@@ -158,7 +168,7 @@ export default async function ProfilePage({
               {canTransitionTo(user.email!, profile.personal_email) && (
                 <button
                   type="submit"
-                  formAction={transitionAuthEmail}
+                  form="transition-auth-email"
                   className="rounded-md border border-line-2 bg-paper px-3 py-1 text-xs font-medium text-ink transition hover:border-brand-400"
                 >
                   Use {profile.personal_email} →
