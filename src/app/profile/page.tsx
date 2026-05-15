@@ -121,7 +121,12 @@ export default async function ProfilePage({
             help="Optional. JPEG / PNG / WebP / GIF, up to 5 MB. Visible to classmates."
           >
             <div className="flex items-center gap-4">
-              <Avatar name={displayName} size="lg" photoUrl={photoUrl} />
+              <Avatar
+                name={displayName}
+                size="lg"
+                photoUrl={photoUrl}
+                ocean={profile.ocean}
+              />
               <input
                 type="file"
                 name="profile_photo"

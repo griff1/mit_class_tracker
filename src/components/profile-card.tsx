@@ -32,9 +32,13 @@ export function ProfileCard({
   return (
     <li className="grid grid-cols-[44px_1fr] gap-4 rounded-md border border-line bg-paper p-4">
       {photoUrl ? (
-        <ClickablePhotoAvatar name={displayName} photoUrl={photoUrl} />
+        <ClickablePhotoAvatar
+          name={displayName}
+          photoUrl={photoUrl}
+          ocean={profile.ocean}
+        />
       ) : (
-        <Avatar name={displayName} size="md" />
+        <Avatar name={displayName} size="md" ocean={profile.ocean} />
       )}
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex items-baseline justify-between gap-3">

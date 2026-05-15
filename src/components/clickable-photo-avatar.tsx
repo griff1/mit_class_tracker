@@ -14,9 +14,11 @@ import { Avatar } from "@/components/avatar";
 export function ClickablePhotoAvatar({
   name,
   photoUrl,
+  ocean,
 }: {
   name: string;
   photoUrl: string;
+  ocean?: string | null;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -28,7 +30,7 @@ export function ClickablePhotoAvatar({
         aria-label={`View larger photo of ${name}`}
         className="flex cursor-zoom-in self-start rounded-md p-0 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-500"
       >
-        <Avatar name={name} size="md" photoUrl={photoUrl} />
+        <Avatar name={name} size="md" photoUrl={photoUrl} ocean={ocean} />
       </button>
       <dialog
         ref={dialogRef}

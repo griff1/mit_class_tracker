@@ -61,7 +61,12 @@ export function AppShell({
           })}
         </ul>
         <form action={signOut} className="flex items-center gap-3">
-          <Avatar name={displayName} size="sm" photoUrl={user.photoUrl} />
+          <Avatar
+            name={displayName}
+            size="sm"
+            photoUrl={user.photoUrl}
+            ocean={user.ocean}
+          />
           <button
             type="submit"
             className="text-xs text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"
