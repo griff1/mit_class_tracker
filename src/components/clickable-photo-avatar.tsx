@@ -26,7 +26,7 @@ export function ClickablePhotoAvatar({
         type="button"
         onClick={() => dialogRef.current?.showModal()}
         aria-label={`View larger photo of ${name}`}
-        className="cursor-zoom-in rounded-md transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="flex cursor-zoom-in self-start rounded-md p-0 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-500"
       >
         <Avatar name={name} size="md" photoUrl={photoUrl} />
       </button>
