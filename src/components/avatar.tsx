@@ -1,21 +1,11 @@
+import { OCEAN_FLAG } from "@/lib/oceans";
+
 type Size = "sm" | "md" | "lg";
 
 const SIZES: Record<Size, { box: string; text: string; notch: string }> = {
-  sm: { box: "h-8 w-8", text: "text-xs", notch: "h-2 w-2 -bottom-0.5 -right-0.5" },
-  md: { box: "h-10 w-10", text: "text-sm", notch: "h-2.5 w-2.5 -bottom-0.5 -right-0.5" },
-  lg: { box: "h-14 w-14", text: "text-lg", notch: "h-3 w-3 -bottom-1 -right-1" },
-};
-
-// Ocean → notch color. Tailwind defaults, no new tokens. Update freely; the
-// values just need to be valid `bg-*` classes that Tailwind's content scanner
-// picks up from this file.
-const OCEAN_NOTCH: Record<string, string> = {
-  Atlantic: "bg-indigo-700",
-  Baltic: "bg-violet-600",
-  Caribbean: "bg-teal-600",
-  Indian: "bg-amber-600",
-  Mediterranean: "bg-emerald-600",
-  Pacific: "bg-sky-600",
+  sm: { box: "h-8 w-8", text: "text-xs", notch: "h-3 w-3 -bottom-0.5 -right-0.5" },
+  md: { box: "h-10 w-10", text: "text-sm", notch: "h-3.5 w-3.5 -bottom-1 -right-1" },
+  lg: { box: "h-14 w-14", text: "text-lg", notch: "h-4 w-4 -bottom-1 -right-1" },
 };
 
 export function Avatar({
@@ -31,7 +21,7 @@ export function Avatar({
 }) {
   const initial = (name.trim()[0] ?? "?").toUpperCase();
   const s = SIZES[size];
-  const notchClass = (ocean && OCEAN_NOTCH[ocean]) ?? "bg-brand-500";
+  const flagSrc = ocean ? OCEAN_FLAG[ocean] : undefined;
   return (
     <div
       aria-hidden="true"
@@ -47,10 +37,20 @@ export function Avatar({
       ) : (
         initial
       )}
-      <span
-        aria-hidden="true"
-        className={`absolute ${s.notch} rounded-sm ${notchClass}`}
-      />
+      {flagSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={flagSrc}
+          alt=""
+          aria-hidden="true"
+          className={`absolute ${s.notch} rounded-[2px] object-cover ring-2 ring-paper`}
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className={`absolute ${s.notch} rounded-sm bg-brand-500 ring-2 ring-paper`}
+        />
+      )}
     </div>
   );
 }

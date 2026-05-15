@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/avatar";
 import { ClickablePhotoAvatar } from "@/components/clickable-photo-avatar";
+import { OCEAN_COLOR } from "@/lib/oceans";
 import { safeLinkedInUrl } from "@/lib/url-safety";
 
 export type DirectoryRow = {
@@ -42,8 +43,16 @@ export function ProfileCard({
       )}
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-ink-3">
-            {profile.ocean ?? "—"} · &apos;26
+          <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em]">
+            <span
+              className={
+                (profile.ocean && OCEAN_COLOR[profile.ocean]?.text) ||
+                "text-ink-3"
+              }
+            >
+              {profile.ocean ?? "—"}
+            </span>
+            <span className="text-ink-3"> · &apos;26</span>
           </span>
           {linkedinHref && (
             <a
