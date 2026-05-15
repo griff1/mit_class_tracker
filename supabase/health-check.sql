@@ -43,6 +43,14 @@ select public.before_user_created_check_mit_domain(
 ) as accepts_mit;
 
 -- ------------------------------------------------------------------------ --
+-- 4b. The function accepts @alum.mit.edu emails.
+--     Should return: {"decision": "continue"}.
+-- ------------------------------------------------------------------------ --
+select public.before_user_created_check_mit_domain(
+  jsonb_build_object('user_metadata', jsonb_build_object('email', 'jane@alum.mit.edu'))
+) as accepts_alum;
+
+-- ------------------------------------------------------------------------ --
 -- 5. The profile-row trigger exists and fires on the right transition.
 -- ------------------------------------------------------------------------ --
 select
