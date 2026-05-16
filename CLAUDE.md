@@ -58,6 +58,7 @@ These project-level dashboard settings are already applied:
 - **Data API**: on (required for `@supabase/ssr`)
 - **Automatically expose new tables**: **off** — no privileges granted to Data API roles by default
 - **Enable automatic RLS**: **on** — event trigger turns on RLS for every new table in `public`
+- **Custom SMTP via Resend**: on (Authentication → SMTP Settings). All auth email (magic links, email-change confirmations) goes through Resend, **not** Supabase's built-in sender. This means Supabase's default 30-emails/hour project cap does **not** apply — the binding limit is Resend's plan (free tier: 100/day, 3000/mo). If you ever see "Email rate limit exceeded" again, check the per-address limit in Authentication → Rate Limits *and* the Resend dashboard logs, not the Supabase default. The Resend API key is stored in Supabase's SMTP config (dashboard only) — it is not in the repo or env files.
 
 **Operational consequence:** a freshly created table is unreachable from the API until you do two things deliberately:
 
@@ -141,9 +142,10 @@ Light-mode only. Cool zinc/gray and pure black/white are deliberately avoided in
 1. Apply project-level settings per `## Supabase project setup` (Data API on, auto-expose off, auto-RLS on).
 2. Copy `.env.example` → `.env.local`; fill from Project Settings → API.
 3. Apply `supabase/migrations/*.sql` in filename order — `supabase db push` if the CLI is linked, otherwise paste them into Dashboard → SQL Editor one by one.
-4. **Enable the Auth Hook in the Dashboard**: Authentication → Hooks → "Before User Created" → Postgres function → schema `public`, function `before_user_created_check_mit_domain`. Save. *Without this toggle the function exists but is never invoked; the Server Action's `endsWith("@mit.edu")` check is the only domain enforcement, and an attacker calling Supabase's REST signup directly would bypass it.*
+4. **Enable the Auth Hook in the Dashboard**: Authentication → Hooks → "Before User Created" → Postgres function → schema `public`, function `before_user_created_check_mit_domain`. Save. *This is the **only** domain gate — there is no app-side `endsWith` check anymore. If the toggle is off, the function exists but is never invoked and any email can sign up. Verify with `supabase/health-check.sql` + an eyeball of the dashboard toggle.*
 5. Authentication → URL Configuration: set Site URL and add `/auth/confirm` to Additional Redirect URLs for every environment (localhost, Vercel preview, Vercel prod).
 6. Authentication → Sign In/Up: confirm "Confirm email" is on (default).
+7. Authentication → SMTP Settings: enable Custom SMTP with Resend (`smtp.resend.com:465`, user `resend`, password = a Resend API key). Without this you're capped at Supabase's 30 emails/hr and signups will rate-limit fast.
 
 ## Deploying to Vercel
 
