@@ -36,7 +36,8 @@ export default async function Home() {
           </Link>
           <p className="text-xs text-ink-3">
             New here? Same button — we&apos;ll create your account from your{" "}
-            <code className="font-mono">@mit.edu</code> address.
+            <code className="font-mono">@mit.edu</code> or{" "}
+            <code className="font-mono">@alum.mit.edu</code> address.
           </p>
         </div>
       </main>
