@@ -31,6 +31,10 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url));
     }
+    console.error(
+      "[auth/confirm] exchangeCodeForSession failed:",
+      error.message,
+    );
   }
 
   // Token-hash flow — used when the email template is customized to point
@@ -40,6 +44,14 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(new URL(next, request.url));
     }
+    console.error("[auth/confirm] verifyOtp failed:", error.message);
+  }
+
+  if (!code && !token_hash) {
+    console.error(
+      "[auth/confirm] no code or token_hash in callback — params present:",
+      Array.from(searchParams.keys()).join(", ") || "(none)",
+    );
   }
 
   return NextResponse.redirect(
