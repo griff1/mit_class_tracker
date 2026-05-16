@@ -27,27 +27,30 @@ select has_function_privilege(
 ) as auth_admin_can_execute;
 
 -- ------------------------------------------------------------------------ --
--- 3. The function actually rejects non-@mit.edu emails.
---    Should return: {"decision": "reject", "message": "..."}.
+-- 3. The function rejects non-@mit.edu emails.
+--    Uses the REAL hook payload shape ({"user":{"email":...}}) — testing a
+--    different shape is exactly how this bug hid before.
+--    MUST return: {"error": {"http_code": 403, "message": "..."}}
+--    (an empty object {} here = the gate is OPEN — fail immediately).
 -- ------------------------------------------------------------------------ --
 select public.before_user_created_check_mit_domain(
-  jsonb_build_object('user_metadata', jsonb_build_object('email', 'attacker@evil.com'))
+  jsonb_build_object('user', jsonb_build_object('email', 'attacker@evil.com'))
 ) as rejects_non_mit;
 
 -- ------------------------------------------------------------------------ --
 -- 4. The function accepts @mit.edu emails.
---    Should return: {"decision": "continue"}.
+--    MUST return: {} (empty object = allow).
 -- ------------------------------------------------------------------------ --
 select public.before_user_created_check_mit_domain(
-  jsonb_build_object('user_metadata', jsonb_build_object('email', 'jane@mit.edu'))
+  jsonb_build_object('user', jsonb_build_object('email', 'jane@mit.edu'))
 ) as accepts_mit;
 
 -- ------------------------------------------------------------------------ --
 -- 4b. The function accepts @alum.mit.edu emails.
---     Should return: {"decision": "continue"}.
+--     MUST return: {} (empty object = allow).
 -- ------------------------------------------------------------------------ --
 select public.before_user_created_check_mit_domain(
-  jsonb_build_object('user_metadata', jsonb_build_object('email', 'jane@alum.mit.edu'))
+  jsonb_build_object('user', jsonb_build_object('email', 'jane@alum.mit.edu'))
 ) as accepts_alum;
 
 -- ------------------------------------------------------------------------ --
