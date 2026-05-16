@@ -67,6 +67,8 @@ export default async function SignInPage({
             required
             placeholder="you@mit.edu"
             autoComplete="email"
+            pattern="[^@\s]+@(alum\.)?mit\.edu"
+            title="Use your @mit.edu or @alum.mit.edu email address"
           />
         </FieldRow>
         <div className="mt-4 flex justify-end border-t border-line pt-3">

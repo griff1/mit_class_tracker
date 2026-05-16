@@ -12,6 +12,24 @@ export async function requestMagicLink(formData: FormData) {
     redirect(`/sign-in?error=${encodeURIComponent("Email is required.")}`);
   }
 
+  // App-side domain check. The before_user_created DB hook is the real
+  // security boundary (it also stops direct REST signups that skip this
+  // form). This is for fast UX feedback — and defense-in-depth so a hook
+  // misconfig isn't a total bypass again.
+  //
+  // CAVEAT: this also blocks an alum who has transitioned their sign-in
+  // email to a personal address from requesting a link. No users have
+  // transitioned yet (the feature isn't live). Before that ships, this
+  // must become "allow if the email already belongs to a known member,
+  // else require @mit.edu/@alum.mit.edu".
+  if (!/@(alum\.)?mit\.edu$/i.test(email)) {
+    redirect(
+      `/sign-in?error=${encodeURIComponent(
+        "Use your @mit.edu or @alum.mit.edu email address.",
+      )}`,
+    );
+  }
+
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
