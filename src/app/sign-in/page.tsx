@@ -61,14 +61,15 @@ export default async function SignInPage({
         className="rounded-md border border-line bg-paper px-5 py-4"
       >
         <FieldRow label="Email">
+          {/* ⚠️ TEMPORARY: pattern/title removed to test the before_user_created
+              hook end-to-end (the pattern would block non-MIT submission
+              client-side). Restore before launch. */}
           <Input
             name="email"
             type="email"
             required
             placeholder="you@mit.edu"
             autoComplete="email"
-            pattern="[^@\s]+@(alum\.)?mit\.edu"
-            title="Use your @mit.edu or @alum.mit.edu email address"
           />
         </FieldRow>
         <div className="mt-4 flex justify-end border-t border-line pt-3">
