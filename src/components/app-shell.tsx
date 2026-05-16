@@ -75,6 +75,16 @@ export function AppShell({
           </button>
         </form>
       </nav>
+      {!user.personalEmail && (
+        <Link
+          href="/profile"
+          className="block rounded-md border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-sm text-amber-800 transition hover:bg-amber-50"
+        >
+          <span className="font-medium">Add a personal email</span> on your
+          profile — your sign-in moves to it automatically so you don&apos;t
+          lose access when your MIT email expires. →
+        </Link>
+      )}
       {children}
     </div>
   );

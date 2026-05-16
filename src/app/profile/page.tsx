@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES, type Profile } from "@/lib/types";
-import { transitionAuthEmail, updateProfile } from "./actions";
+import { updateProfile } from "./actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Section } from "@/components/section";
@@ -86,6 +86,7 @@ export default async function ProfilePage({
       user={{
         name: profile.name,
         email: user.email!,
+        personalEmail: profile.personal_email,
         ocean: profile.ocean,
         photoUrl,
       }}
@@ -109,20 +110,17 @@ export default async function ProfilePage({
       {email_transition === "pending" && (
         <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-800">
           Confirmation link sent to your personal email. Open it from that
-          inbox to switch your sign-in over. Until you click it, you keep
+          inbox to move your sign-in over. Until you click it, you keep
           signing in with your current email.
         </p>
       )}
-
-      {/*
-        Transition form is declared SEPARATELY from the main updateProfile
-        form, so pressing Enter in any text input in the main form doesn't
-        accidentally submit the email-change action (browsers use the first
-        submit button as the implicit-submit target). The button below uses
-        `form="transition-auth-email"` to associate itself with this form
-        despite being visually nested inside the main form.
-      */}
-      <form id="transition-auth-email" action={transitionAuthEmail} />
+      {email_transition === "error" && (
+        <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
+          Profile saved, but we couldn&apos;t start moving your sign-in to that
+          personal email (it may already be in use on another account). Try a
+          different address.
+        </p>
+      )}
 
       <form action={updateProfile} className="flex flex-col gap-3">
         <Section label="Identity" index={1}>
@@ -163,18 +161,7 @@ export default async function ProfilePage({
             label="Sign-in email"
             help={signInEmailHelp(user.email!, profile.personal_email)}
           >
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="font-mono text-sm text-ink">{user.email}</span>
-              {canTransitionTo(user.email!, profile.personal_email) && (
-                <button
-                  type="submit"
-                  form="transition-auth-email"
-                  className="rounded-md border border-line-2 bg-paper px-3 py-1 text-xs font-medium text-ink transition hover:border-brand-400"
-                >
-                  Use {profile.personal_email} →
-                </button>
-              )}
-            </div>
+            <span className="font-mono text-sm text-ink">{user.email}</span>
           </FieldRow>
         </Section>
 
@@ -260,25 +247,17 @@ export default async function ProfilePage({
   );
 }
 
-function canTransitionTo(
-  currentEmail: string,
-  personalEmail: string | null,
-): boolean {
-  if (!personalEmail) return false;
-  return currentEmail.toLowerCase() !== personalEmail.toLowerCase();
-}
-
 function signInEmailHelp(
   currentEmail: string,
   personalEmail: string | null,
 ): string {
   if (!personalEmail) {
-    return "Set a personal email above first; then you can transition sign-in to it before MIT access expires.";
+    return "Where your 6-digit sign-in code is sent. Add a personal email above and sign-in moves to it automatically — do this before your MIT email expires.";
   }
   if (currentEmail.toLowerCase() === personalEmail.toLowerCase()) {
-    return "You've transitioned — your MIT email no longer signs you in. Magic links go to this address.";
+    return "Moved over — sign-in codes now go to your personal email. Your MIT email stays as your directory identity.";
   }
-  return "Click the button to switch sign-in to your personal email. Supabase will send a confirmation link to that address.";
+  return "Codes still come here. Saving your personal email started the move; open the confirmation link we emailed to that address to finish it.";
 }
 
 function ErrorShell({
@@ -293,7 +272,7 @@ function ErrorShell({
   return (
     <AppShell
       active="profile"
-      user={{ name: null, email, ocean: null, photoUrl: null }}
+      user={{ name: null, email, personalEmail: null, ocean: null, photoUrl: null }}
     >
       <PageHeader eyebrow="Your profile" title={title} />
       <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">

@@ -6,6 +6,7 @@ type ServerClient = Awaited<ReturnType<typeof createClient>>;
 export type Viewer = {
   name: string | null;
   email: string;
+  personalEmail: string | null;
   ocean: string | null;
   photoUrl: string | null;
 };
@@ -25,10 +26,11 @@ export async function getViewer(
 ): Promise<Viewer> {
   const { data } = await supabase
     .from("profiles")
-    .select("name, ocean, profile_photo_url")
+    .select("name, personal_email, ocean, profile_photo_url")
     .eq("id", user.id)
     .maybeSingle<{
       name: string | null;
+      personal_email: string | null;
       ocean: string | null;
       profile_photo_url: string | null;
     }>();
@@ -44,6 +46,7 @@ export async function getViewer(
   return {
     name: data?.name ?? null,
     email: user.email!,
+    personalEmail: data?.personal_email ?? null,
     ocean: data?.ocean ?? null,
     photoUrl,
   };

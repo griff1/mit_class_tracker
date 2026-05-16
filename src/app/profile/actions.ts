@@ -181,6 +181,14 @@ export async function updateProfile(formData: FormData) {
     payload.profile_photo_url = photoPath;
   }
 
+  // Capture the previously-saved personal email so the sign-in transition is
+  // auto-initiated only when it's newly added or changed — not on every save.
+  const { data: prev } = await supabase
+    .from("profiles")
+    .select("personal_email")
+    .eq("id", user.id)
+    .maybeSingle<{ personal_email: string | null }>();
+
   const { error } = await supabase
     .from("profiles")
     .update(payload)
@@ -194,63 +202,34 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/directory");
   revalidatePath("/stats");
   revalidatePath("/map");
+
+  // Auto-transition the sign-in identity: adding or changing the personal
+  // email moves auth.users.email to it — there is no separate opt-in, this is
+  // the only lockout defense (see CLAUDE.md). mit_email stays as the historical
+  // directory identity. Supabase emails a confirmation to the new address;
+  // until it's clicked the old email still signs them in. Requires Supabase
+  // "Secure email change" OFF, else a second confirmation is also sent to the
+  // Safe-Links-eaten MIT inbox and the change never lands.
+  const newPersonal =
+    typeof payload.personal_email === "string" ? payload.personal_email : null;
+  const authEmail = (user.email ?? "").toLowerCase();
+  const prevPersonal = prev?.personal_email?.toLowerCase() ?? null;
+  if (
+    newPersonal &&
+    newPersonal.toLowerCase() !== authEmail &&
+    newPersonal.toLowerCase() !== prevPersonal
+  ) {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    const { error: transitionError } = await supabase.auth.updateUser(
+      { email: newPersonal },
+      { emailRedirectTo: `${siteUrl}/auth/confirm?next=/profile` },
+    );
+    redirect(
+      `/profile?saved=1&email_transition=${
+        transitionError ? "error" : "pending"
+      }`,
+    );
+  }
+
   redirect("/profile?saved=1");
-}
-
-/**
- * Transition the user's sign-in email from their MIT address to their saved
- * personal_email. Used when an alum is about to lose @mit.edu access.
- *
- * Constraints (enforced server-side):
- *   - User must be signed in
- *   - profile.personal_email must be set (we won't transition to an empty value)
- *   - Current auth email must NOT already equal personal_email
- *
- * Supabase sends a confirmation link to the *new* email; once the user clicks
- * it, `auth.users.email` updates and they sign in with that address going
- * forward. The `before_user_created` Auth Hook does NOT fire on email change
- * — only on initial signup — so the @mit.edu domain check is intentionally
- * not applied here (alumni moving to gmail / outlook / etc. is the point).
- *
- * `profile.mit_email` is left untouched as the historical identity.
- */
-export async function transitionAuthEmail() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("personal_email")
-    .eq("id", user.id)
-    .maybeSingle<{ personal_email: string | null }>();
-
-  const target = profile?.personal_email?.trim();
-  if (!target) {
-    redirect(
-      `/profile?error=${encodeURIComponent(
-        "Set a personal email first, then come back to transition.",
-      )}`,
-    );
-  }
-  if (user.email?.toLowerCase() === target.toLowerCase()) {
-    redirect(
-      `/profile?error=${encodeURIComponent(
-        "You're already signing in with your personal email.",
-      )}`,
-    );
-  }
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { error } = await supabase.auth.updateUser(
-    { email: target },
-    { emailRedirectTo: `${siteUrl}/auth/confirm?next=/profile` },
-  );
-  if (error) {
-    redirect(`/profile?error=${encodeURIComponent(error.message)}`);
-  }
-
-  redirect("/profile?email_transition=pending");
 }
