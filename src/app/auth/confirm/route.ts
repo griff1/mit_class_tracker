@@ -19,8 +19,22 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
+  let type = searchParams.get("type") as EmailOtpType | null;
   const next = safeNext(searchParams.get("next"));
+
+  // Some email templates render an empty `type` (e.g. `{{ .EmailActionType }}`
+  // is not populated in the Magic Link template on every Supabase project).
+  // For a token_hash link, `email` verifies both magic-link and signup
+  // tokens. Email-change links MUST send `type=email_change` explicitly from
+  // their own template — that one can't be safely inferred here.
+  if (token_hash && !type) {
+    console.warn(
+      "[auth/confirm] token_hash present but `type` is empty — defaulting to " +
+        "'email'. Hardcode &type=email (or &type=email_change for the Change " +
+        "Email template) in the Supabase email template.",
+    );
+    type = "email";
+  }
 
   const supabase = await createClient();
 
