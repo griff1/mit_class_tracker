@@ -246,3 +246,62 @@ export async function updateProfile(formData: FormData) {
 
   redirect("/profile?saved=1");
 }
+
+/**
+ * Recovery path for a stranded alumni transition: re-sends the email-change
+ * confirmation when the user never received or lost it. The auto-transition in
+ * updateProfile only fires when personal_email actually changes, so without
+ * this a lost confirmation has no resend.
+ *
+ * Restricted server-side to the user's already-saved personal_email (it cannot
+ * retarget the change), which keeps the takeover surface identical to the
+ * automatic path. supabase.auth.resend only resends an existing pending
+ * email_change — it can't initiate one — and is rate-limited by Supabase
+ * (no app-side throttle, consistent with the OTP posture).
+ */
+export async function resendEmailTransition() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("personal_email")
+    .eq("id", user.id)
+    .maybeSingle<{ personal_email: string | null }>();
+
+  const target = profile?.personal_email?.trim();
+  if (!target) {
+    redirect(
+      `/profile?error=${encodeURIComponent(
+        "No pending sign-in change — add a personal email first.",
+      )}`,
+    );
+  }
+  if (user.email?.toLowerCase() === target.toLowerCase()) {
+    redirect(
+      `/profile?error=${encodeURIComponent(
+        "You're already signing in with your personal email — nothing to confirm.",
+      )}`,
+    );
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const { error } = await supabase.auth.resend({
+    type: "email_change",
+    email: target,
+    options: { emailRedirectTo: `${siteUrl}/auth/confirm?next=/profile` },
+  });
+
+  if (error) {
+    redirect(
+      `/profile?error=${encodeURIComponent(
+        "Couldn't resend the confirmation — it may be rate-limited (wait a minute) or there's no pending change. If you just added your personal email, hit Save profile to restart the move.",
+      )}`,
+    );
+  }
+
+  redirect("/profile?email_transition=pending");
+}

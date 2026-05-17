@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES, type Profile } from "@/lib/types";
-import { updateProfile } from "./actions";
+import { resendEmailTransition, updateProfile } from "./actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Section } from "@/components/section";
@@ -86,6 +86,9 @@ export default async function ProfilePage({
   }
 
   const displayName = profile.name?.trim() || profile.mit_email;
+  const transitionPending =
+    !!profile.personal_email &&
+    user.email!.toLowerCase() !== profile.personal_email.toLowerCase();
 
   return (
     <AppShell
@@ -114,12 +117,24 @@ export default async function ProfilePage({
           {error}
         </p>
       )}
-      {email_transition === "pending" && (
-        <p className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-800">
-          Confirmation link sent to your personal email. Open it from that
-          inbox to move your sign-in over. Until you click it, you keep
-          signing in with your current email.
-        </p>
+      {transitionPending && (
+        <div className="flex flex-col items-start gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-800">
+          <p>
+            Your sign-in is moving to{" "}
+            <span className="font-medium">{profile.personal_email}</span>. Open
+            the confirmation link we emailed there to finish — until then you
+            keep signing in with{" "}
+            <span className="font-mono">{user.email}</span>.
+          </p>
+          <form action={resendEmailTransition}>
+            <button
+              type="submit"
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100"
+            >
+              Resend confirmation email
+            </button>
+          </form>
+        </div>
       )}
       {email_transition === "error" && (
         <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
