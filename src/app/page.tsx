@@ -54,30 +54,32 @@ export default async function Home() {
 
   const { data: cityRows } = await supabase
     .from("profiles")
-    .select("cities");
+    .select("cities, visiting_cities");
 
   const cities = new Set(
     (cityRows ?? []).flatMap((r) => (r.cities as string[] | null) ?? []),
   ).size;
 
-  const cityCounts = new Map<string, number>();
-  for (const r of cityRows ?? []) {
-    for (const c of (r.cities as string[] | null) ?? []) {
-      cityCounts.set(c, (cityCounts.get(c) ?? 0) + 1);
+  function geoAggregate(field: "cities" | "visiting_cities") {
+    const counts = new Map<string, number>();
+    for (const r of cityRows ?? []) {
+      for (const c of (r[field] as string[] | null) ?? []) {
+        counts.set(c, (counts.get(c) ?? 0) + 1);
+      }
     }
-  }
-  const mapped: MapAggregate[] = [];
-  const unmapped: { city: string; count: number }[] = [];
-  for (const [city, count] of cityCounts.entries()) {
-    const coords = CITY_COORDS[city.toLowerCase()];
-    if (coords) {
-      mapped.push({ city, count, ...coords });
-    } else {
-      unmapped.push({ city, count });
+    const mapped: MapAggregate[] = [];
+    const unmapped: { city: string; count: number }[] = [];
+    for (const [city, count] of counts.entries()) {
+      const coords = CITY_COORDS[city.toLowerCase()];
+      if (coords) mapped.push({ city, count, ...coords });
+      else unmapped.push({ city, count });
     }
+    unmapped.sort((a, b) => b.count - a.count);
+    return { mapped, unmapped };
   }
-  unmapped.sort((a, b) => b.count - a.count);
-  const unmappedTotal = unmapped.reduce((acc, u) => acc + u.count, 0);
+
+  const liveLayer = geoAggregate("cities");
+  const visitLayer = geoAggregate("visiting_cities");
 
   const { data: indRows } = await supabase
     .from("profiles")
@@ -108,14 +110,26 @@ export default async function Home() {
           Where everyone is
         </h2>
         <div className="overflow-hidden rounded-md border border-line bg-paper">
-          <ClassMap aggregates={mapped} />
+          <ClassMap livesHere={liveLayer.mapped} visits={visitLayer.mapped} />
         </div>
-        {unmapped.length > 0 && (
+        {liveLayer.unmapped.length > 0 && (
           <p className="text-xs text-ink-3">
-            {unmappedTotal} {unmappedTotal === 1 ? "person" : "people"} in{" "}
-            {unmapped.length} {unmapped.length === 1 ? "city" : "cities"} not
-            yet pinned —{" "}
-            {unmapped.map((u) => `${u.city} (${u.count})`).join(", ")}
+            <span className="font-mono uppercase tracking-[0.1em]">
+              Lives here
+            </span>{" "}
+            — not yet pinned:{" "}
+            {liveLayer.unmapped.map((u) => `${u.city} (${u.count})`).join(", ")}
+          </p>
+        )}
+        {visitLayer.unmapped.length > 0 && (
+          <p className="text-xs text-ink-3">
+            <span className="font-mono uppercase tracking-[0.1em]">
+              Frequently visits
+            </span>{" "}
+            — not yet pinned:{" "}
+            {visitLayer.unmapped
+              .map((u) => `${u.city} (${u.count})`)
+              .join(", ")}
           </p>
         )}
       </section>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -10,6 +11,8 @@ export type MapAggregate = {
   lat: number;
   lng: number;
 };
+
+type View = "live" | "visit";
 
 function pinIcon(count: number) {
   const size = Math.min(28 + count * 4, 64);
@@ -22,31 +25,69 @@ function pinIcon(count: number) {
   });
 }
 
-export function ClassMap({ aggregates }: { aggregates: MapAggregate[] }) {
+export function ClassMap({
+  livesHere,
+  visits,
+}: {
+  livesHere: MapAggregate[];
+  visits: MapAggregate[];
+}) {
+  const [view, setView] = useState<View>("live");
+  const aggregates = view === "live" ? livesHere : visits;
+  const noun = view === "live" ? "live here" : "frequently visit";
+
   return (
-    <MapContainer
-      center={[25, 0]}
-      zoom={2}
-      worldCopyJump
-      style={{ height: 420, width: "100%" }}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {aggregates.map((a) => (
-        <Marker key={a.city} position={[a.lat, a.lng]} icon={pinIcon(a.count)}>
-          <Popup>
-            <div style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
-              <strong style={{ color: "#1f1814" }}>{a.city}</strong>
-              <br />
-              <span style={{ color: "#5b4f44" }}>
-                {a.count} {a.count === 1 ? "person" : "people"}
-              </span>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+    <div>
+      <div className="flex items-center gap-1 border-b border-line p-2">
+        {(
+          [
+            ["live", "Lives here"],
+            ["visit", "Frequently visits"],
+          ] as [View, string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            aria-pressed={view === key}
+            className={`rounded-sm px-3 py-1 font-mono text-[0.65rem] uppercase tracking-[0.12em] transition ${
+              view === key
+                ? "bg-ink text-cream"
+                : "text-ink-2 hover:text-ink"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <MapContainer
+        center={[25, 0]}
+        zoom={2}
+        worldCopyJump
+        style={{ height: 420, width: "100%" }}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {aggregates.map((a) => (
+          <Marker
+            key={`${view}-${a.city}`}
+            position={[a.lat, a.lng]}
+            icon={pinIcon(a.count)}
+          >
+            <Popup>
+              <div style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+                <strong style={{ color: "#1f1814" }}>{a.city}</strong>
+                <br />
+                <span style={{ color: "#5b4f44" }}>
+                  {a.count} {a.count === 1 ? "person" : "people"} {noun}
+                </span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
   );
 }

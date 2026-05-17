@@ -8,7 +8,12 @@ import { safeEmail, safeLinkedInUrl } from "@/lib/url-safety";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
-type SeededColumn = "industries" | "roles" | "cities" | "activities";
+type SeededColumn =
+  | "industries"
+  | "roles"
+  | "cities"
+  | "visiting_cities"
+  | "activities";
 
 function trimOrNull(v: FormDataEntryValue | null): string | null {
   if (typeof v !== "string") return null;
@@ -149,6 +154,13 @@ export async function updateProfile(formData: FormData) {
     manyStrings(formData.getAll("cities")),
     trimOrNull(formData.get("cities_new")),
   );
+  const visitingCities = await resolveCanonical(
+    supabase,
+    "visiting_cities",
+    CITIES,
+    manyStrings(formData.getAll("visiting_cities")),
+    trimOrNull(formData.get("visiting_cities_new")),
+  );
   const activities = await resolveCanonical(
     supabase,
     "activities",
@@ -169,6 +181,7 @@ export async function updateProfile(formData: FormData) {
     industries,
     roles,
     cities,
+    visiting_cities: visitingCities,
     linkedin_url: safeLinkedInUrl(
       typeof formData.get("linkedin_url") === "string"
         ? (formData.get("linkedin_url") as string)

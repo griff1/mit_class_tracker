@@ -21,6 +21,7 @@ type SearchParams = {
   roles?: string | string[];
   ocean?: string | string[];
   cities?: string | string[];
+  visiting_cities?: string | string[];
   activities?: string | string[];
 };
 
@@ -56,6 +57,7 @@ export default async function DirectoryPage({
   const selectedIndustries = many(sp.industries);
   const selectedRoles = many(sp.roles);
   const selectedCities = many(sp.cities);
+  const selectedVisitingCities = many(sp.visiting_cities);
   const selectedActivities = many(sp.activities);
 
   const supabase = await createClient();
@@ -69,7 +71,7 @@ export default async function DirectoryPage({
   // Build chip options as seed ∪ cohort, deduped case-insensitively.
   const { data: cohort } = await supabase
     .from("profiles")
-    .select("industries, roles, cities, activities");
+    .select("industries, roles, cities, visiting_cities, activities");
   const cohortIndustries = (cohort ?? []).flatMap(
     (r) => (r.industries as string[] | null) ?? [],
   );
@@ -79,18 +81,22 @@ export default async function DirectoryPage({
   const cohortCities = (cohort ?? []).flatMap(
     (r) => (r.cities as string[] | null) ?? [],
   );
+  const cohortVisitingCities = (cohort ?? []).flatMap(
+    (r) => (r.visiting_cities as string[] | null) ?? [],
+  );
   const cohortActivities = (cohort ?? []).flatMap(
     (r) => (r.activities as string[] | null) ?? [],
   );
   const industryOptions = unionCanonical(INDUSTRIES, cohortIndustries);
   const roleOptions = unionCanonical(ROLES, cohortRoles);
   const cityOptions = unionCanonical(CITIES, cohortCities);
+  const visitingCityOptions = unionCanonical(CITIES, cohortVisitingCities);
   const activityOptions = unionCanonical(ACTIVITIES, cohortActivities);
 
   let query = supabase
     .from("profiles")
     .select(
-      "id, name, mit_email, personal_email, company, title, industries, roles, cities, linkedin_url, ocean, profile_photo_url, activities",
+      "id, name, mit_email, personal_email, company, title, industries, roles, cities, visiting_cities, linkedin_url, ocean, profile_photo_url, activities",
     )
     .order("name", { ascending: true, nullsFirst: false });
 
@@ -100,6 +106,8 @@ export default async function DirectoryPage({
   if (ocean && (OCEANS as readonly string[]).includes(ocean))
     query = query.eq("ocean", ocean);
   if (selectedCities.length) query = query.overlaps("cities", selectedCities);
+  if (selectedVisitingCities.length)
+    query = query.overlaps("visiting_cities", selectedVisitingCities);
   if (selectedActivities.length) query = query.overlaps("activities", selectedActivities);
 
   const { data: profiles, error } = await query.returns<DirectoryRow[]>();
@@ -128,6 +136,7 @@ export default async function DirectoryPage({
     selectedIndustries.length ||
     selectedRoles.length ||
     selectedCities.length ||
+    selectedVisitingCities.length ||
     selectedActivities.length
   );
 
@@ -176,6 +185,12 @@ export default async function DirectoryPage({
               name="cities"
               options={cityOptions}
               selected={selectedCities}
+            />
+            <ChipFilter
+              label="Frequently in"
+              name="visiting_cities"
+              options={visitingCityOptions}
+              selected={selectedVisitingCities}
             />
             <ChipFilter
               label="Activities"

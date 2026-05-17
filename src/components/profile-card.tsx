@@ -13,6 +13,7 @@ export type DirectoryRow = {
   industries: string[];
   roles: string[];
   cities: string[];
+  visiting_cities: string[];
   linkedin_url: string | null;
   ocean: string | null;
   profile_photo_url: string | null;
@@ -88,6 +89,14 @@ export function ProfileCard({
         {profile.cities.length > 0 && (
           <p className="text-xs text-ink-2 before:mr-1 before:font-mono before:text-ink-3 before:content-['—']">
             {profile.cities.join(" · ")}
+          </p>
+        )}
+        {profile.visiting_cities.length > 0 && (
+          <p className="text-xs text-ink-2">
+            <span className="mr-1.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] text-ink-3">
+              Often in
+            </span>
+            {profile.visiting_cities.join(" · ")}
           </p>
         )}
         {profile.roles.length > 0 && (

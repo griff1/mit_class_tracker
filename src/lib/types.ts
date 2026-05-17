@@ -8,6 +8,7 @@ export type Profile = {
   industries: string[];
   roles: string[];
   cities: string[];
+  visiting_cities: string[];
   linkedin_url: string | null;
   profile_photo_url: string | null;
   ocean: string | null;
@@ -68,7 +69,8 @@ export const OCEANS = [
 ] as const;
 
 // Seed list for the cities chip group. Members can add others, which then
-// appear as chips alongside these for everyone in the cohort.
+// appear as chips alongside these for everyone in the cohort. Shared by both
+// `cities` (where you live) and `visiting_cities` (where you frequently go).
 export const CITIES = [
   "Atlanta, GA",
   "Austin, TX",

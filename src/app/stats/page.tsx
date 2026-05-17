@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 
 type Row = Pick<
   Profile,
-  "cities" | "industries" | "roles" | "activities" | "ocean"
+  "cities" | "visiting_cities" | "industries" | "roles" | "activities" | "ocean"
 >;
 
 export default async function StatsPage() {
@@ -21,11 +21,12 @@ export default async function StatsPage() {
 
   const { data: rows } = await supabase
     .from("profiles")
-    .select("cities, industries, roles, activities, ocean")
+    .select("cities, visiting_cities, industries, roles, activities, ocean")
     .returns<Row[]>();
 
   const total = (rows ?? []).length;
   const cityCounts = aggregateArray(rows, "cities");
+  const visitingCounts = aggregateArray(rows, "visiting_cities");
   const industryCounts = aggregateArray(rows, "industries");
   const roleCounts = aggregateArray(rows, "roles");
   const activityCounts = aggregateArray(rows, "activities");
@@ -41,6 +42,7 @@ export default async function StatsPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <StatBlock title="Top cities" rows={cityCounts.slice(0, 10)} total={total} />
+        <StatBlock title="Top frequently-in cities" rows={visitingCounts.slice(0, 10)} total={total} />
         <StatBlock title="Top industries" rows={industryCounts.slice(0, 10)} total={total} />
         <StatBlock title="Top roles" rows={roleCounts.slice(0, 10)} total={total} />
         <StatBlock title="Top activities" rows={activityCounts.slice(0, 10)} total={total} />
@@ -57,7 +59,7 @@ export default async function StatsPage() {
 
 function aggregateArray(
   rows: Row[] | null,
-  key: "cities" | "industries" | "roles" | "activities",
+  key: "cities" | "visiting_cities" | "industries" | "roles" | "activities",
 ) {
   const counts = new Map<string, number>();
   for (const r of rows ?? []) {

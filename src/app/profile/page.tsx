@@ -53,7 +53,7 @@ export default async function ProfilePage({
   // editable chip groups.
   const { data: cohort } = await supabase
     .from("profiles")
-    .select("industries, roles, cities, activities");
+    .select("industries, roles, cities, visiting_cities, activities");
   const knownIndustries = Array.from(
     new Set((cohort ?? []).flatMap((r) => (r.industries as string[] | null) ?? [])),
   );
@@ -62,6 +62,13 @@ export default async function ProfilePage({
   );
   const knownCities = Array.from(
     new Set((cohort ?? []).flatMap((r) => (r.cities as string[] | null) ?? [])),
+  );
+  const knownVisitingCities = Array.from(
+    new Set(
+      (cohort ?? []).flatMap(
+        (r) => (r.visiting_cities as string[] | null) ?? [],
+      ),
+    ),
   );
   const knownActivities = Array.from(
     new Set((cohort ?? []).flatMap((r) => (r.activities as string[] | null) ?? [])),
@@ -199,6 +206,15 @@ export default async function ProfilePage({
               newName="cities_new"
               options={[...CITIES, ...knownCities]}
               selected={profile.cities}
+              newPlaceholder="Add a city not listed (e.g. Portland, OR)"
+            />
+          </FieldRow>
+          <FieldRow label="Frequently in" help="Cities you travel to often for work or otherwise. Shown on the map under a separate toggle.">
+            <EditableChipGroup
+              name="visiting_cities"
+              newName="visiting_cities_new"
+              options={[...CITIES, ...knownVisitingCities]}
+              selected={profile.visiting_cities}
               newPlaceholder="Add a city not listed (e.g. Portland, OR)"
             />
           </FieldRow>
