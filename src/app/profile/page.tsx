@@ -143,6 +143,14 @@ export default async function ProfilePage({
           different address.
         </p>
       )}
+      {(email_transition === "pending" || email_transition === "resent") && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Confirmation email sent to{" "}
+          <span className="font-medium">{profile.personal_email}</span>. Open
+          it from that inbox to finish moving your sign-in — check spam, it can
+          take a minute to arrive.
+        </p>
+      )}
 
       <form action={updateProfile} className="flex flex-col gap-3">
         <Section label="Identity" index={1}>

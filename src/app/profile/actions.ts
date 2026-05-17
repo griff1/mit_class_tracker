@@ -248,16 +248,20 @@ export async function updateProfile(formData: FormData) {
 }
 
 /**
- * Recovery path for a stranded alumni transition: re-sends the email-change
+ * Recovery path for a stranded alumni transition: re-trigger the email-change
  * confirmation when the user never received or lost it. The auto-transition in
  * updateProfile only fires when personal_email actually changes, so without
- * this a lost confirmation has no resend.
+ * this a lost confirmation has no way to be re-sent.
  *
- * Restricted server-side to the user's already-saved personal_email (it cannot
- * retarget the change), which keeps the takeover surface identical to the
- * automatic path. supabase.auth.resend only resends an existing pending
- * email_change — it can't initiate one — and is rate-limited by Supabase
- * (no app-side throttle, consistent with the OTP posture).
+ * Uses the SAME `updateUser({ email })` call as the auto-transition — not
+ * `auth.resend`, which only re-sends an *already-pending* email_change and so
+ * silently does nothing if no change is in progress (e.g. it expired, was
+ * never initiated, or was already consumed). `updateUser` (re)initiates the
+ * change and sends the confirmation every time, which is what "re-trigger"
+ * needs. Restricted server-side to the user's already-saved personal_email so
+ * it cannot retarget the change — the takeover surface is identical to the
+ * automatic path. Supabase rate-limits the email (no app-side throttle,
+ * consistent with the OTP posture).
  */
 export async function resendEmailTransition() {
   const supabase = await createClient();
@@ -276,7 +280,7 @@ export async function resendEmailTransition() {
   if (!target) {
     redirect(
       `/profile?error=${encodeURIComponent(
-        "No pending sign-in change — add a personal email first.",
+        "Add a personal email first — there's no sign-in change to confirm.",
       )}`,
     );
   }
@@ -289,19 +293,18 @@ export async function resendEmailTransition() {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { error } = await supabase.auth.resend({
-    type: "email_change",
-    email: target,
-    options: { emailRedirectTo: `${siteUrl}/auth/confirm?next=/profile` },
-  });
+  const { error } = await supabase.auth.updateUser(
+    { email: target },
+    { emailRedirectTo: `${siteUrl}/auth/confirm?next=/profile` },
+  );
 
   if (error) {
     redirect(
       `/profile?error=${encodeURIComponent(
-        "Couldn't resend the confirmation — it may be rate-limited (wait a minute) or there's no pending change. If you just added your personal email, hit Save profile to restart the move.",
+        "Couldn't re-send the confirmation — it may be rate-limited (wait a minute), or that address is already in use on another account.",
       )}`,
     );
   }
 
-  redirect("/profile?email_transition=pending");
+  redirect("/profile?email_transition=resent");
 }
