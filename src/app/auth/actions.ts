@@ -3,12 +3,16 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// Sign-in is a 6-digit emailed code, NOT a magic link. Every user is on MIT
-// Microsoft 365, whose Safe Links scanner pre-fetches inbound URLs and consumes
-// the single-use token before the human clicks. A typed code has no URL to
-// pre-fetch. The Supabase "Magic Link" email template MUST render only
-// `{{ .Token }}` and contain NO confirmation URL — the code and the link share
-// one OTP, so a prefetched link would burn the code too. See CLAUDE.md.
+// Sign-in/sign-up is a 6-digit emailed code, NOT a magic link. Every user is
+// on MIT Microsoft 365, whose Safe Links scanner pre-fetches inbound URLs and
+// consumes the single-use token before the human clicks; a typed code has no
+// URL to pre-fetch. signInWithOtp sends DIFFERENT templates depending on the
+// user: returning users get "Magic Link", brand-new signups (Confirm email is
+// on) get "Confirm signup". BOTH Supabase templates MUST render only
+// `{{ .Token }}` with NO confirmation URL — the link and the code share one
+// OTP, so a prefetched link burns the code too. Correspondingly, the code
+// verifies as type 'email' for returning users and 'signup' for new signups,
+// so verifyEmailOtp tries both. See CLAUDE.md.
 
 export async function requestLoginCode(formData: FormData) {
   const email = String(formData.get("email") ?? "")
@@ -59,11 +63,19 @@ export async function verifyEmailOtp(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp({
-    email,
-    token,
-    type: "email",
-  });
+  // The same code box handles two GoTrue token classes: returning sign-ins
+  // (magic-link OTP → type 'email') and brand-new signups when "Confirm email"
+  // is on (signup-confirmation OTP → type 'signup'). We can't tell which the
+  // user pasted, so try 'email' then fall back to 'signup'. A failed verify
+  // does not consume the token and attempts are GoTrue-rate-limited.
+  let { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+  if (error) {
+    ({ error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "signup",
+    }));
+  }
 
   if (error) {
     back("That code is invalid or expired. Request a new one.");
