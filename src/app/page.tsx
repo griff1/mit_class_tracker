@@ -54,25 +54,34 @@ export default async function Home() {
 
   const { data: cityRows } = await supabase
     .from("profiles")
-    .select("cities, visiting_cities");
+    .select("name, mit_email, cities, visiting_cities");
 
   const cities = new Set(
     (cityRows ?? []).flatMap((r) => (r.cities as string[] | null) ?? []),
   ).size;
 
   function geoAggregate(field: "cities" | "visiting_cities") {
-    const counts = new Map<string, number>();
+    const byCity = new Map<string, string[]>();
     for (const r of cityRows ?? []) {
+      const display =
+        ((r.name as string | null)?.trim() ||
+          (r.mit_email as string | null)) ??
+        "Member";
       for (const c of (r[field] as string[] | null) ?? []) {
-        counts.set(c, (counts.get(c) ?? 0) + 1);
+        const list = byCity.get(c) ?? [];
+        list.push(display);
+        byCity.set(c, list);
       }
     }
     const mapped: MapAggregate[] = [];
     const unmapped: { city: string; count: number }[] = [];
-    for (const [city, count] of counts.entries()) {
+    for (const [city, people] of byCity.entries()) {
+      people.sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: "base" }),
+      );
       const coords = CITY_COORDS[city.toLowerCase()];
-      if (coords) mapped.push({ city, count, ...coords });
-      else unmapped.push({ city, count });
+      if (coords) mapped.push({ city, count: people.length, people, ...coords });
+      else unmapped.push({ city, count: people.length });
     }
     unmapped.sort((a, b) => b.count - a.count);
     return { mapped, unmapped };

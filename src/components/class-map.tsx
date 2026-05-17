@@ -8,18 +8,22 @@ import "leaflet/dist/leaflet.css";
 export type MapAggregate = {
   city: string;
   count: number;
+  people: string[];
   lat: number;
   lng: number;
 };
 
 type View = "live" | "visit";
 
-function pinIcon(count: number) {
+const LIVE_COLOR = "#e85d45"; // brand coral
+const VISIT_COLOR = "#2563eb"; // blue, deliberately cool to read as a distinct layer
+
+function pinIcon(count: number, color: string) {
   const size = Math.min(28 + count * 4, 64);
   const fontSize = Math.max(11, Math.round(size / 3.2));
   return L.divIcon({
     className: "",
-    html: `<div style="width:${size}px;height:${size}px;background:#e85d45;color:#ffffff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:${fontSize}px;font-family:ui-sans-serif,system-ui,sans-serif;border:2px solid #ffffff;box-shadow:0 1px 3px rgba(31,24,20,0.35);letter-spacing:-0.02em;">${count}</div>`,
+    html: `<div style="width:${size}px;height:${size}px;background:${color};color:#ffffff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:${fontSize}px;font-family:ui-sans-serif,system-ui,sans-serif;border:2px solid #ffffff;box-shadow:0 1px 3px rgba(31,24,20,0.35);letter-spacing:-0.02em;">${count}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -35,6 +39,7 @@ export function ClassMap({
   const [view, setView] = useState<View>("live");
   const aggregates = view === "live" ? livesHere : visits;
   const noun = view === "live" ? "live here" : "frequently visit";
+  const color = view === "live" ? LIVE_COLOR : VISIT_COLOR;
 
   return (
     <div>
@@ -74,15 +79,46 @@ export function ClassMap({
           <Marker
             key={`${view}-${a.city}`}
             position={[a.lat, a.lng]}
-            icon={pinIcon(a.count)}
+            icon={pinIcon(a.count, color)}
           >
             <Popup>
-              <div style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+              <div
+                style={{
+                  fontFamily: "ui-sans-serif, system-ui, sans-serif",
+                  minWidth: 168,
+                }}
+              >
                 <strong style={{ color: "#1f1814" }}>{a.city}</strong>
-                <br />
-                <span style={{ color: "#5b4f44" }}>
+                <div
+                  style={{
+                    color: "#5b4f44",
+                    fontSize: 12,
+                    margin: "2px 0 6px",
+                  }}
+                >
                   {a.count} {a.count === 1 ? "person" : "people"} {noun}
-                </span>
+                </div>
+                <ul
+                  style={{
+                    listStyle: "none",
+                    margin: 0,
+                    padding: 0,
+                    maxHeight: 160,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  {a.people.map((p, i) => (
+                    <li
+                      key={`${p}-${i}`}
+                      style={{ color: "#1f1814", fontSize: 13 }}
+                    >
+                      {p}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Popup>
           </Marker>
