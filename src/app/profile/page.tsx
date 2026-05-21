@@ -10,6 +10,7 @@ import { FieldRow, ReadOnlyValue } from "@/components/field-row";
 import { Input, Select } from "@/components/inputs";
 import { EditableChipGroup } from "@/components/editable-chip-group";
 import { Avatar } from "@/components/avatar";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function ProfilePage({
   searchParams,
@@ -274,12 +275,7 @@ export default async function ProfilePage({
         </Section>
 
         <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            className="rounded-md bg-ink px-5 py-2 text-sm font-medium text-cream transition hover:bg-ink-2"
-          >
-            Save profile
-          </button>
+          <SubmitButton pendingLabel="Saving…">Save profile</SubmitButton>
         </div>
       </form>
     </AppShell>
