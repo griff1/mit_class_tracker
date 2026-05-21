@@ -140,6 +140,9 @@ Light-mode only. Cool zinc/gray and pure black/white are deliberately avoided in
 - **Components** — shared primitives live in `src/components/` (`AppShell`, `PageHeader`, `Section`, `FieldRow`, `Input`/`Select`/`ReadOnlyValue`, `Chip`, `Avatar`, `ProfileCard`). Always compose new pages from these rather than re-styling raw HTML.
 - **Chip filters are JS-less.** Each chip is a `<label>` wrapping a hidden checkbox plus a styled `<span>` that toggles via `peer-checked:`. This lets the directory's GET-form filter UI survive without client JS. Use `<Chip>` for any multi-select control.
 - **No `dark:` variants** anywhere. If we add dark mode later, do it via a class-toggled theme, not OS preference.
+- **Mobile responsive primitives.** Two components carry the responsive structure that the rest of the app inherits — don't break them:
+  - `FieldRow` stacks **label-above-control** on mobile and becomes a `grid-cols-[130px_1fr]` side-by-side layout at `sm:` and up. Cascades to every form (profile, sign-in). If you author a new form, use `FieldRow` and you get this for free.
+  - `AppShell` nav is a 2-column grid on mobile (logo top-left, sign-out top-right, nav links spanning a centered row below) and an `sm:flex` row from `sm:` up — placement on desktop is driven by `sm:order-{1,2,3}` (logo / links / sign-out) on the three children, so DOM order is logo → sign-out → links. Logo shrinks `h-10 → sm:h-14`. Reordering children without preserving the `order-*` classes will scramble the desktop layout.
 
 ## Bootstrap checklist (fresh Supabase project)
 

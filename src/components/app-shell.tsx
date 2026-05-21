@@ -25,21 +25,41 @@ export function AppShell({
   const displayName = user.name?.trim() || user.email;
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-6">
-      <nav className="flex items-center justify-between rounded-md border border-line bg-paper px-4 py-2.5">
-        <Link href="/" className="flex items-center gap-3">
+      <nav className="grid grid-cols-2 items-center gap-y-2 rounded-md border border-line bg-paper px-4 py-2.5 sm:flex sm:justify-between sm:gap-4">
+        <Link
+          href="/"
+          className="flex items-center gap-2 sm:order-1 sm:gap-3"
+        >
           <Image
             src="/mit-sloan-logo.png"
             alt="MIT Sloan"
             width={3300}
             height={2550}
-            className="h-14 w-auto"
+            className="h-10 w-auto sm:h-14"
             priority
           />
           <span className="hidden font-mono text-[0.65rem] font-medium uppercase tracking-[0.18em] text-brand-700 sm:inline">
             Class of &apos;26
           </span>
         </Link>
-        <ul className="flex items-center gap-5 text-sm">
+        <form
+          action={signOut}
+          className="flex items-center justify-end gap-2 sm:order-3 sm:gap-3"
+        >
+          <Avatar
+            name={displayName}
+            size="sm"
+            photoUrl={user.photoUrl}
+            ocean={user.ocean}
+          />
+          <button
+            type="submit"
+            className="text-xs text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"
+          >
+            Sign out
+          </button>
+        </form>
+        <ul className="col-span-2 flex items-center justify-center gap-4 text-sm sm:order-2 sm:gap-5">
           {SECTIONS.map((s) => {
             const isActive = s.key === active;
             const baseClass = isActive
@@ -60,20 +80,6 @@ export function AppShell({
             );
           })}
         </ul>
-        <form action={signOut} className="flex items-center gap-3">
-          <Avatar
-            name={displayName}
-            size="sm"
-            photoUrl={user.photoUrl}
-            ocean={user.ocean}
-          />
-          <button
-            type="submit"
-            className="text-xs text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"
-          >
-            Sign out
-          </button>
-        </form>
       </nav>
       {!user.personalEmail && (
         <Link

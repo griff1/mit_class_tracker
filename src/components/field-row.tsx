@@ -8,8 +8,8 @@ export function FieldRow({
   help?: string;
 }) {
   return (
-    <div className="grid grid-cols-[130px_1fr] items-start gap-4 border-t border-line py-3 first:border-t-0">
-      <span className="pt-2 font-mono text-[0.65rem] uppercase tracking-[0.12em] text-ink-3">
+    <div className="flex flex-col gap-2 border-t border-line py-3 first:border-t-0 sm:grid sm:grid-cols-[130px_1fr] sm:items-start sm:gap-4">
+      <span className="font-mono text-[0.65rem] uppercase tracking-[0.12em] text-ink-3 sm:pt-2">
         {label}
       </span>
       <div className="flex flex-col gap-1">
