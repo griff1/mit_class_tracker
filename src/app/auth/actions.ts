@@ -29,6 +29,23 @@ export async function requestLoginCode(formData: FormData) {
   // below. Pre-deploy, the hook is verified by supabase/health-check.sql.
   const supabase = await createClient();
 
+  // Catch the "stranded MIT email" case before any signup email goes out: if
+  // someone signed up with alice@mit.edu and later moved their sign-in to
+  // alice@gmail.com, typing alice@mit.edu here would otherwise trigger a
+  // brand-new signup that fails at verifyOtp (the on_auth_user_confirmed
+  // trigger trips profiles.mit_email UNIQUE), surfaced as a useless
+  // "invalid code". See is_replaced_mit_email migration for full rationale.
+  const { data: isReplaced } = await supabase.rpc("is_replaced_mit_email", {
+    email,
+  });
+  if (isReplaced) {
+    redirect(
+      `/sign-in?error=${encodeURIComponent(
+        "This MIT email is no longer your sign-in address — use the personal email you set on your profile. If you've also lost access to that, contact an admin.",
+      )}`,
+    );
+  }
+
   // signInWithOtp covers both sign-up and sign-in (shouldCreateUser defaults
   // to true): a new email creates auth.users (gated by the before_user_created
   // hook); an existing user gets a code to whatever auth.users.email currently
