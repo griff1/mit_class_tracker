@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { geocodeCity } from "@/lib/geocode";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES } from "@/lib/types";
 import { safeEmail, safeLinkedInUrl } from "@/lib/url-safety";
 
@@ -215,6 +217,72 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/directory");
   revalidatePath("/stats");
   revalidatePath("/map");
+
+  // Schedule background geocoding for any new (or stale-negative-cached)
+  // cities, so the home map pins them on the next render without a code
+  // edit. See src/lib/geocode.ts + the city_coords migration for the full
+  // design. Runs in after() so the user's save UX is not blocked on
+  // Nominatim (typically ~500ms+ per request, and we deliberately serialize
+  // at 1 req/sec to respect their usage policy).
+  const labelByKey = new Map<string, string>();
+  for (const c of [...cities, ...visitingCities]) {
+    const trimmed = c.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (!labelByKey.has(key)) labelByKey.set(key, trimmed);
+  }
+  const cityKeys = Array.from(labelByKey.keys());
+  if (cityKeys.length > 0) {
+    const { data: existing } = await supabase
+      .from("city_coords")
+      .select("city_key, lat, geocoded_at")
+      .in("city_key", cityKeys);
+
+    const STALE_NEGATIVE_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const existingByKey = new Map(
+      (existing ?? []).map((r) => [
+        r.city_key as string,
+        { lat: r.lat as number | null, geocoded_at: r.geocoded_at as string },
+      ]),
+    );
+    const toGeocode = cityKeys.filter((key) => {
+      const row = existingByKey.get(key);
+      if (!row) return true;
+      if (row.lat === null) {
+        return now - new Date(row.geocoded_at).getTime() > STALE_NEGATIVE_MS;
+      }
+      return false;
+    });
+
+    if (toGeocode.length > 0) {
+      after(async () => {
+        for (let i = 0; i < toGeocode.length; i++) {
+          if (i > 0) {
+            await new Promise((r) => setTimeout(r, 1100));
+          }
+          const key = toGeocode[i];
+          const result = await geocodeCity(key);
+          if (result.ok) {
+            await supabase.rpc("cache_city_coords", {
+              p_key: key,
+              p_label: labelByKey.get(key) ?? null,
+              p_lat: result.lat,
+              p_lng: result.lng,
+            });
+          } else if (result.reason === "miss") {
+            await supabase.rpc("cache_city_coords", {
+              p_key: key,
+              p_label: labelByKey.get(key) ?? null,
+              p_lat: null,
+              p_lng: null,
+            });
+          }
+          // transient: skip caching, next save retries naturally.
+        }
+      });
+    }
+  }
 
   // Auto-transition the sign-in identity: adding or changing the personal
   // email moves auth.users.email to it — there is no separate opt-in, this is

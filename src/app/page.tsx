@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/viewer";
-import { CITY_COORDS } from "@/lib/cities-geo";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { ClassMap, type MapAggregate } from "@/components/class-map";
@@ -60,6 +59,44 @@ export default async function Home() {
     (cityRows ?? []).flatMap((r) => (r.cities as string[] | null) ?? []),
   ).size;
 
+  // Pull cached coords from city_coords for every city that appears on a
+  // profile (either layer). Newly-saved cities are geocoded in the
+  // background by updateProfile -> Nominatim -> cache_city_coords, so they
+  // pin themselves on a subsequent render. Anything still missing (genuine
+  // geocoder miss or a brand-new city whose after() task has not landed
+  // yet) falls into the per-layer "not yet pinned" disclosure below. The
+  // try/catch keeps the home page rendering even if the table is missing
+  // (e.g. the migration has not been applied yet).
+  const allCityKeys = new Set<string>();
+  for (const r of cityRows ?? []) {
+    for (const c of (r.cities as string[] | null) ?? []) {
+      const k = c.trim().toLowerCase();
+      if (k) allCityKeys.add(k);
+    }
+    for (const c of (r.visiting_cities as string[] | null) ?? []) {
+      const k = c.trim().toLowerCase();
+      if (k) allCityKeys.add(k);
+    }
+  }
+  const coordsByKey = new Map<string, { lat: number; lng: number }>();
+  if (allCityKeys.size > 0) {
+    try {
+      const { data: coordRows } = await supabase
+        .from("city_coords")
+        .select("city_key, lat, lng")
+        .in("city_key", Array.from(allCityKeys));
+      for (const row of coordRows ?? []) {
+        const lat = row.lat as number | null;
+        const lng = row.lng as number | null;
+        if (lat !== null && lng !== null) {
+          coordsByKey.set(row.city_key as string, { lat, lng });
+        }
+      }
+    } catch {
+      // Treat as no coords; everything falls to the unmapped disclosure.
+    }
+  }
+
   function geoAggregate(field: "cities" | "visiting_cities") {
     const byCity = new Map<string, string[]>();
     for (const r of cityRows ?? []) {
@@ -79,7 +116,7 @@ export default async function Home() {
       people.sort((a, b) =>
         a.localeCompare(b, undefined, { sensitivity: "base" }),
       );
-      const coords = CITY_COORDS[city.toLowerCase()];
+      const coords = coordsByKey.get(city.trim().toLowerCase());
       if (coords) mapped.push({ city, count: people.length, people, ...coords });
       else unmapped.push({ city, count: people.length });
     }
