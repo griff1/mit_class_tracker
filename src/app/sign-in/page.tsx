@@ -92,7 +92,8 @@ export default async function SignInPage({
         </h1>
         <p className="text-sm text-ink-2">
           We&apos;ll email you a 6-digit sign-in code. New accounts: use your{" "}
-          <code className="font-mono">@mit.edu</code> or{" "}
+          <code className="font-mono">@mit.edu</code>,{" "}
+          <code className="font-mono">@sloan.mit.edu</code>, or{" "}
           <code className="font-mono">@alum.mit.edu</code> address. Returning
           alumni: use whichever address you sign in with now.
         </p>

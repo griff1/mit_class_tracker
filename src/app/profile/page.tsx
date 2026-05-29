@@ -105,7 +105,7 @@ export default async function ProfilePage({
       <PageHeader
         eyebrow="Your profile"
         title={profile.name?.trim() || "Tell your class about yourself"}
-        sub="Visible to other signed-in @mit.edu classmates."
+        sub="Visible to other signed-in MIT classmates."
       />
 
       {saved && (

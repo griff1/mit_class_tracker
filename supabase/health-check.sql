@@ -54,6 +54,14 @@ select public.before_user_created_check_mit_domain(
 ) as accepts_alum;
 
 -- ------------------------------------------------------------------------ --
+-- 4c. The function accepts @sloan.mit.edu emails.
+--     MUST return: {} (empty object = allow).
+-- ------------------------------------------------------------------------ --
+select public.before_user_created_check_mit_domain(
+  jsonb_build_object('user', jsonb_build_object('email', 'jane@sloan.mit.edu'))
+) as accepts_sloan;
+
+-- ------------------------------------------------------------------------ --
 -- 5. The profile-row trigger exists and fires on the right transition.
 -- ------------------------------------------------------------------------ --
 select
