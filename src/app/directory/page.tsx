@@ -146,6 +146,26 @@ export default async function DirectoryPage({
     selectedActivities.length
   );
 
+  // Tie the form's React identity to the URL filter state. The chip
+  // checkboxes / Selects use `defaultChecked` / `defaultValue` /
+  // `<details open>`, which React applies ONLY on mount — when the user
+  // clicks Clear (a soft Next.js navigation, not a reload) the existing
+  // DOM is reused with fresh props that React deliberately ignores, so
+  // previously-checked chips stay checked in the DOM and get submitted
+  // with the next search. Changing this key on every URL state change
+  // forces a full remount, so every chip reads its checked state from
+  // the current URL.
+  const filterKey = JSON.stringify({
+    q,
+    program,
+    ocean,
+    i: selectedIndustries,
+    r: selectedRoles,
+    c: selectedCities,
+    v: selectedVisitingCities,
+    a: selectedActivities,
+  });
+
   return (
     <AppShell active="directory" user={viewer}>
       <PageHeader
@@ -160,7 +180,12 @@ export default async function DirectoryPage({
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[260px_1fr]">
         <aside className="self-start rounded-md border border-line bg-paper p-4">
-          <form action="/directory" method="get" className="flex flex-col gap-4">
+          <form
+            key={filterKey}
+            action="/directory"
+            method="get"
+            className="flex flex-col gap-4"
+          >
             <FilterGroup label="Search">
               <Input type="text" name="q" defaultValue={q} placeholder="Name…" />
             </FilterGroup>
