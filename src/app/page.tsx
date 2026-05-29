@@ -5,6 +5,16 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { ClassMap, type MapAggregate } from "@/components/class-map";
 
+// Cities that should collapse onto a parent metro's pin on the home map.
+// Keys are exact canonical city strings (as stored in `profiles.cities` /
+// `visiting_cities`); values are the metro hub whose coords + label win.
+// Only the map merges — the directory card and stats keep each member's
+// own city. Extend as other metros (NY-area outer boroughs, SF Bay, etc.)
+// start producing the same Boston/Cambridge fragmentation.
+const METRO_OF: Record<string, string> = {
+  "Cambridge, MA": "Boston, MA",
+};
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -99,21 +109,27 @@ export default async function Home() {
   }
 
   function geoAggregate(field: "cities" | "visiting_cities") {
-    const byCity = new Map<string, string[]>();
+    // Bucket by metro: nearby cities that share a metro area collapse to a
+    // single pin (so e.g. Cambridge, MA + Boston, MA = one Boston pin).
+    // The directory card still shows each member's actual answer; only the
+    // map merges. Extend METRO_OF when other metros (NY/NJ, SF Bay, etc.)
+    // start showing the same Boston/Cambridge pattern.
+    const byMetro = new Map<string, string[]>();
     for (const r of cityRows ?? []) {
       const display =
         ((r.name as string | null)?.trim() ||
           (r.mit_email as string | null)) ??
         "Member";
       for (const c of (r[field] as string[] | null) ?? []) {
-        const list = byCity.get(c) ?? [];
+        const metro = METRO_OF[c] ?? c;
+        const list = byMetro.get(metro) ?? [];
         list.push(display);
-        byCity.set(c, list);
+        byMetro.set(metro, list);
       }
     }
     const mapped: MapAggregate[] = [];
     const unmapped: { city: string; count: number }[] = [];
-    for (const [city, people] of byCity.entries()) {
+    for (const [city, people] of byMetro.entries()) {
       people.sort((a, b) =>
         a.localeCompare(b, undefined, { sensitivity: "base" }),
       );

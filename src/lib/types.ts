@@ -96,6 +96,7 @@ export const CITIES = [
   "Berlin, Germany",
   "Boston, MA",
   "Buenos Aires, Argentina",
+  "Cambridge, MA",
   "Chicago, IL",
   "Dubai, UAE",
   "Hong Kong",
