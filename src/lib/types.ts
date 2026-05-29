@@ -12,6 +12,7 @@ export type Profile = {
   linkedin_url: string | null;
   profile_photo_url: string | null;
   ocean: string | null;
+  program: string | null;
   activities: string[];
   created_at: string;
   updated_at: string;
@@ -66,6 +67,21 @@ export const OCEANS = [
   "Indian",
   "Mediterranean",
   "Pacific",
+] as const;
+
+// MIT degree programs. Strict allow-list (no add-new) — same shape as OCEANS.
+// Ordering reflects rough cohort size: MBA-track programs first, then
+// specialized masters, then PhD / undergrad.
+export const PROGRAMS = [
+  "MBA",
+  "LGO",
+  "SFMBA",
+  "EMBA",
+  "MFin",
+  "MBAn",
+  "MSMS",
+  "PhD",
+  "UGrad",
 ] as const;
 
 // Seed list for the cities chip group. Members can add others, which then

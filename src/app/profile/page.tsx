@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES, type Profile } from "@/lib/types";
+import {
+  ACTIVITIES,
+  CITIES,
+  INDUSTRIES,
+  OCEANS,
+  PROGRAMS,
+  ROLES,
+  type Profile,
+} from "@/lib/types";
 import { resendEmailTransition, updateProfile } from "./actions";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -263,6 +271,16 @@ export default async function ProfilePage({
         </Section>
 
         <Section label="Sloan" index={4}>
+          <FieldRow label="Program" help="Which MIT degree program you're in.">
+            <Select name="program" defaultValue={profile.program ?? ""}>
+              <option value="">— Select —</option>
+              {PROGRAMS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </Select>
+          </FieldRow>
           <FieldRow label="Activities" help="Clubs, competitions, fellowships — pick all that apply, or add one we don't have.">
             <EditableChipGroup
               name="activities"

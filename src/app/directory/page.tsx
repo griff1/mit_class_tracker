@@ -7,6 +7,7 @@ import {
   CITIES,
   INDUSTRIES,
   OCEANS,
+  PROGRAMS,
   ROLES,
 } from "@/lib/types";
 import { AppShell } from "@/components/app-shell";
@@ -20,6 +21,7 @@ type SearchParams = {
   industries?: string | string[];
   roles?: string | string[];
   ocean?: string | string[];
+  program?: string | string[];
   cities?: string | string[];
   visiting_cities?: string | string[];
   activities?: string | string[];
@@ -54,6 +56,7 @@ export default async function DirectoryPage({
   const sp = await searchParams;
   const q = single(sp.q).trim();
   const ocean = single(sp.ocean).trim();
+  const program = single(sp.program).trim();
   const selectedIndustries = many(sp.industries);
   const selectedRoles = many(sp.roles);
   const selectedCities = many(sp.cities);
@@ -96,7 +99,7 @@ export default async function DirectoryPage({
   let query = supabase
     .from("profiles")
     .select(
-      "id, name, mit_email, personal_email, company, title, industries, roles, cities, visiting_cities, linkedin_url, ocean, profile_photo_url, activities",
+      "id, name, mit_email, personal_email, company, title, industries, roles, cities, visiting_cities, linkedin_url, ocean, program, profile_photo_url, activities",
     )
     .order("name", { ascending: true, nullsFirst: false });
 
@@ -105,6 +108,8 @@ export default async function DirectoryPage({
   if (selectedRoles.length) query = query.overlaps("roles", selectedRoles);
   if (ocean && (OCEANS as readonly string[]).includes(ocean))
     query = query.eq("ocean", ocean);
+  if (program && (PROGRAMS as readonly string[]).includes(program))
+    query = query.eq("program", program);
   if (selectedCities.length) query = query.overlaps("cities", selectedCities);
   if (selectedVisitingCities.length)
     query = query.overlaps("visiting_cities", selectedVisitingCities);
@@ -133,6 +138,7 @@ export default async function DirectoryPage({
   const hasFilters = !!(
     q ||
     ocean ||
+    program ||
     selectedIndustries.length ||
     selectedRoles.length ||
     selectedCities.length ||
@@ -157,6 +163,16 @@ export default async function DirectoryPage({
           <form action="/directory" method="get" className="flex flex-col gap-4">
             <FilterGroup label="Search">
               <Input type="text" name="q" defaultValue={q} placeholder="Name…" />
+            </FilterGroup>
+            <FilterGroup label="Program">
+              <Select name="program" defaultValue={program}>
+                <option value="">Any</option>
+                {PROGRAMS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </Select>
             </FilterGroup>
             <FilterGroup label="Ocean">
               <Select name="ocean" defaultValue={ocean}>

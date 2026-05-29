@@ -1,13 +1,19 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/viewer";
-import { OCEANS, type Profile } from "@/lib/types";
+import { OCEANS, PROGRAMS, type Profile } from "@/lib/types";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 
 type Row = Pick<
   Profile,
-  "cities" | "visiting_cities" | "industries" | "roles" | "activities" | "ocean"
+  | "cities"
+  | "visiting_cities"
+  | "industries"
+  | "roles"
+  | "activities"
+  | "ocean"
+  | "program"
 >;
 
 export default async function StatsPage() {
@@ -21,7 +27,7 @@ export default async function StatsPage() {
 
   const { data: rows } = await supabase
     .from("profiles")
-    .select("cities, visiting_cities, industries, roles, activities, ocean")
+    .select("cities, visiting_cities, industries, roles, activities, ocean, program")
     .returns<Row[]>();
 
   const total = (rows ?? []).length;
@@ -31,6 +37,7 @@ export default async function StatsPage() {
   const roleCounts = aggregateArray(rows, "roles");
   const activityCounts = aggregateArray(rows, "activities");
   const oceanCounts = aggregateScalar(rows, "ocean");
+  const programCounts = aggregateScalar(rows, "program");
 
   return (
     <AppShell active="stats" user={viewer}>
@@ -46,6 +53,12 @@ export default async function StatsPage() {
         <StatBlock title="Top industries" rows={industryCounts.slice(0, 10)} total={total} />
         <StatBlock title="Top roles" rows={roleCounts.slice(0, 10)} total={total} />
         <StatBlock title="Top activities" rows={activityCounts.slice(0, 10)} total={total} />
+        <StatBlock
+          title="Programs"
+          rows={programCounts}
+          total={total}
+          ordered={PROGRAMS}
+        />
         <StatBlock
           title="Oceans"
           rows={oceanCounts}
@@ -72,7 +85,7 @@ function aggregateArray(
     .sort((a, b) => b.count - a.count);
 }
 
-function aggregateScalar(rows: Row[] | null, key: "ocean") {
+function aggregateScalar(rows: Row[] | null, key: "ocean" | "program") {
   const counts = new Map<string, number>();
   for (const r of rows ?? []) {
     const v = r[key];
@@ -96,7 +109,8 @@ function StatBlock({
   ordered?: readonly string[];
 }) {
   // If `ordered` is supplied, force that order and include zero-count entries
-  // (so all 6 oceans show up even when only some have members).
+  // (so every entry in the allow-list — oceans, programs — shows up even when
+  // only some have members).
   const display = ordered
     ? ordered.map((label) => {
         const found = rows.find((r) => r.label === label);

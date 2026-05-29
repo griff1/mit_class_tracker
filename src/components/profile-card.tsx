@@ -16,6 +16,7 @@ export type DirectoryRow = {
   visiting_cities: string[];
   linkedin_url: string | null;
   ocean: string | null;
+  program: string | null;
   profile_photo_url: string | null;
   activities: string[];
 };
@@ -45,15 +46,39 @@ export function ProfileCard({
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em]">
-            <span
-              className={
-                (profile.ocean && OCEAN_COLOR[profile.ocean]?.text) ||
-                "text-ink-3"
-              }
-            >
-              {profile.ocean ?? "—"}
-            </span>
-            <span className="text-ink-3"> · &apos;26</span>
+            {profile.program && (
+              <>
+                <span className="text-ink-3">{profile.program}</span>
+                <span className="text-ink-3"> · </span>
+              </>
+            )}
+            {profile.program ? (
+              profile.ocean && (
+                <>
+                  <span
+                    className={
+                      OCEAN_COLOR[profile.ocean]?.text || "text-ink-3"
+                    }
+                  >
+                    {profile.ocean}
+                  </span>
+                  <span className="text-ink-3"> · </span>
+                </>
+              )
+            ) : (
+              <>
+                <span
+                  className={
+                    (profile.ocean && OCEAN_COLOR[profile.ocean]?.text) ||
+                    "text-ink-3"
+                  }
+                >
+                  {profile.ocean ?? "—"}
+                </span>
+                <span className="text-ink-3"> · </span>
+              </>
+            )}
+            <span className="text-ink-3">&apos;26</span>
           </span>
           {linkedinHref && (
             <a

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeCity } from "@/lib/geocode";
-import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, ROLES } from "@/lib/types";
+import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, PROGRAMS, ROLES } from "@/lib/types";
 import { safeEmail, safeLinkedInUrl } from "@/lib/url-safety";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -190,6 +190,7 @@ export async function updateProfile(formData: FormData) {
         : null,
     ),
     ocean: oneOfOrNull(formData.get("ocean"), OCEANS),
+    program: oneOfOrNull(formData.get("program"), PROGRAMS),
     activities,
   };
   if (photoPath !== undefined) {
