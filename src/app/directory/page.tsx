@@ -37,6 +37,30 @@ function many(v: string | string[] | undefined): string[] {
   return (Array.isArray(v) ? v : [v]).map((s) => s.trim()).filter(Boolean);
 }
 
+/**
+ * Build a PostgREST array literal from string elements, quoting and
+ * escaping each so values with commas / braces / quotes round-trip
+ * correctly.
+ *
+ * Why this exists: supabase-js's `.overlaps(col, arr)` builds the URL
+ * value as `ov.{${arr.join(",")}}` -- a plain comma join. PostgREST
+ * then parses `{Boston, MA}` as a two-element array `[Boston, " MA"]`,
+ * neither of which matches the literal "Boston, MA" stored in
+ * `profiles.cities`. Every city with a comma (NYC, SF, Boston, ...)
+ * silently returned zero matches. We sidestep that by constructing the
+ * literal ourselves with `"..."` around every element and passing it
+ * through the generic `.filter(col, "ov", ...)` escape hatch.
+ *
+ * Per PostgREST array-literal rules: wrap each element in double
+ * quotes; inside, escape backslash as `\\\\` and double-quote as `\\"`.
+ */
+function pgArrayLiteral(values: readonly string[]): string {
+  const escaped = values.map(
+    (v) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+  );
+  return `{${escaped.join(",")}}`;
+}
+
 function unionCanonical(seed: readonly string[], cohort: string[]): string[] {
   const seen = new Map<string, string>();
   for (const v of [...seed, ...cohort]) {
@@ -104,16 +128,27 @@ export default async function DirectoryPage({
     .order("name", { ascending: true, nullsFirst: false });
 
   if (q) query = query.ilike("name", `%${q}%`);
-  if (selectedIndustries.length) query = query.overlaps("industries", selectedIndustries);
-  if (selectedRoles.length) query = query.overlaps("roles", selectedRoles);
+  // All array-overlaps filters use .filter("col", "ov", pgArrayLiteral(...))
+  // instead of .overlaps(...) so values containing commas survive the
+  // PostgREST array-literal round-trip. See pgArrayLiteral above.
+  if (selectedIndustries.length)
+    query = query.filter("industries", "ov", pgArrayLiteral(selectedIndustries));
+  if (selectedRoles.length)
+    query = query.filter("roles", "ov", pgArrayLiteral(selectedRoles));
   if (ocean && (OCEANS as readonly string[]).includes(ocean))
     query = query.eq("ocean", ocean);
   if (program && (PROGRAMS as readonly string[]).includes(program))
     query = query.eq("program", program);
-  if (selectedCities.length) query = query.overlaps("cities", selectedCities);
+  if (selectedCities.length)
+    query = query.filter("cities", "ov", pgArrayLiteral(selectedCities));
   if (selectedVisitingCities.length)
-    query = query.overlaps("visiting_cities", selectedVisitingCities);
-  if (selectedActivities.length) query = query.overlaps("activities", selectedActivities);
+    query = query.filter(
+      "visiting_cities",
+      "ov",
+      pgArrayLiteral(selectedVisitingCities),
+    );
+  if (selectedActivities.length)
+    query = query.filter("activities", "ov", pgArrayLiteral(selectedActivities));
 
   const { data: profiles, error } = await query.returns<DirectoryRow[]>();
 
