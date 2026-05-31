@@ -93,6 +93,17 @@ export default async function ReferralsPage({
               autoComplete="off"
             />
           </FieldRow>
+          <FieldRow
+            label="First name"
+            help="Optional. Personalizes the invite greeting (otherwise it opens with “Hi there”)."
+          >
+            <Input
+              name="name"
+              type="text"
+              placeholder="Alex"
+              autoComplete="off"
+            />
+          </FieldRow>
           <div className="flex justify-end pt-2">
             <SubmitButton pendingLabel="Sending…">Send invite</SubmitButton>
           </div>

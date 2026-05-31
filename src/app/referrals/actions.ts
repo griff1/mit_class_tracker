@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { escapeHtml, sendEmail } from "@/lib/email";
+import { renderReferralEmail, sendEmail } from "@/lib/email";
 import { generateReferralCode } from "@/lib/referral-code";
 import { safeEmail } from "@/lib/url-safety";
 
@@ -86,34 +86,34 @@ export async function sendReferral(formData: FormData) {
     fail(`Could not save referral: ${insertError.message}`);
   }
 
-  // Build the invite URL. Email pre-fills the sign-in form; ref is the
-  // load-bearing piece for credit -- verifyEmailOtp redeems whichever
-  // code was used (cookie set in requestLoginCode), so if A and B both
-  // invite X only the link X actually clicked gets credit.
+  // Build the invite URL. `ref` is the only param: it is the load-bearing
+  // piece for credit -- verifyEmailOtp redeems whichever code was used
+  // (cookie set in requestLoginCode), so if A and B both invite X only the
+  // link X actually clicked gets credit. We deliberately do NOT embed the
+  // recipient's email in the query string: a long URL carrying an address
+  // is a phishing/tracking fingerprint that hurts deliverability (esp. into
+  // MIT's Microsoft 365), and having the recipient type their own address
+  // is marginally safer anyway.
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const referralUrl =
-    `${siteUrl}/sign-in?email=${encodeURIComponent(normalized!)}` +
-    `&ref=${encodeURIComponent(code)}`;
+  const referralUrl = `${siteUrl}/sign-in?ref=${encodeURIComponent(code)}`;
 
-  const referrerName =
-    me!.name?.trim() || me!.mit_email || "A classmate";
-  const subject = `${referrerName} invited you to Sloanopedia`;
-  const text = [
-    `Hi,`,
-    ``,
-    `${referrerName} invited you to join Sloanopedia, the private directory for the MIT Sloan Class of 2026.`,
-    ``,
-    `Sign in here to claim your profile:`,
+  const referrerName = me!.name?.trim() || me!.mit_email || "A classmate";
+
+  // Greeting name: the referrer optionally types it (they know the person).
+  // We deliberately do NOT guess from the email -- most MIT addresses are
+  // Kerberos IDs (e.g. "rcheeti") with no recoverable first name, and a wrong
+  // guess in an invite reads worse than the neutral "Hi there," fallback that
+  // renderReferralEmail applies when this is blank.
+  const recipientName =
+    typeof formData.get("name") === "string"
+      ? (formData.get("name") as string).trim().slice(0, 50) || null
+      : null;
+
+  const { subject, text, html } = renderReferralEmail({
+    referrerName,
     referralUrl,
-    ``,
-    `Sloanopedia is class-members-only. You will get a 6-digit access code emailed to your @mit.edu, @sloan.mit.edu, or @alum.mit.edu address.`,
-  ].join("\n");
-  const html = [
-    `<p>Hi,</p>`,
-    `<p><strong>${escapeHtml(referrerName)}</strong> invited you to join <a href="${siteUrl}">Sloanopedia</a>, the private directory for the MIT Sloan Class of 2026.</p>`,
-    `<p><a href="${referralUrl}">Sign in here to claim your profile</a>.</p>`,
-    `<p style="color:#5b4f44;font-size:13px">Sloanopedia is class-members-only. You will get a 6-digit access code emailed to your @mit.edu, @sloan.mit.edu, or @alum.mit.edu address.</p>`,
-  ].join("");
+    recipientName,
+  });
 
   // Send via Resend. If the API call fails AFTER the DB insert, the row
   // exists but no email went out -- the user sees the error and can use

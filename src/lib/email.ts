@@ -56,13 +56,13 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 
   if (!res.ok) {
     // Surface the Resend error body to the caller so the Server Action
-    // can render something specific (rate-limited, unverified domain, etc.).
+    // can render something specific (rate limit, unverified domain, etc.).
     const body = await res.text();
     throw new Error(`Resend ${res.status}: ${body.slice(0, 300)}`);
   }
 }
 
-/** Basic HTML escape for interpolating untrusted strings into our minimal email template. */
+/** Basic HTML escape for interpolating untrusted strings into our email templates. */
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -70,4 +70,145 @@ export function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * Brand palette for emails. Mirrors the app's design tokens
+ * (src/app/globals.css): warm cream/paper surfaces, warm-dark "ink" text,
+ * a single coral accent. Hex only -- email clients (especially MIT's
+ * Outlook/Microsoft 365, which every recipient is on) don't support the
+ * oklch() the app uses, so these are the sRGB equivalents.
+ */
+const EMAIL = {
+  cream: "#f5ecda", // page background (--color-cream)
+  paper: "#ffffff", // card surface (--color-paper)
+  ink: "#1f1814", // primary text / headings (--color-ink)
+  ink2: "#5b4f44", // body text (--color-ink-2)
+  ink3: "#8a7b6b", // tertiary / footnotes (--color-ink-3)
+  line: "#d2c19a", // hairline rules (--color-line)
+  coral: "#e85d45", // brand accent / eyebrow (--color-brand-500)
+  coralDark: "#a23420", // links on light bg (--color-brand-700)
+} as const;
+
+// Web-safe font stacks. The app uses Geist + JetBrains Mono, which won't
+// load in mail clients, so fall back to the platform system stacks while
+// keeping the same sans/mono split that makes the UI feel "documented".
+const SANS =
+  "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const MONO =
+  "'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace";
+
+export type ReferralEmailInput = {
+  /** Inviter's display name (already chosen by the caller; will be escaped). */
+  referrerName: string;
+  /** Full sign-in URL carrying ?ref= (will be escaped for the href + visible link). */
+  referralUrl: string;
+  /**
+   * Recipient's first name for the greeting, if known (typed by the referrer
+   * or best-effort parsed from their email). Falls back to a neutral greeting
+   * when null/blank. Will be escaped.
+   */
+  recipientName?: string | null;
+};
+
+/**
+ * Render the referral-invite email (subject + plaintext + HTML).
+ *
+ * The HTML is a table-based, inline-styled layout deliberately built for
+ * Outlook/Microsoft 365 compatibility (no flexbox, no <style> block, no
+ * background images, bulletproof button as a padded bgcolor table cell).
+ * Visual language matches the app: coral mono eyebrow, ink headline,
+ * ink-on-cream primary button (the app's primary CTA is bg-ink/text-cream,
+ * with coral reserved as the accent), hairline divider, mono footnote.
+ */
+export function renderReferralEmail({
+  referrerName,
+  referralUrl,
+  recipientName,
+}: ReferralEmailInput): { subject: string; text: string; html: string } {
+  const name = escapeHtml(referrerName);
+  const url = escapeHtml(referralUrl);
+
+  const greetName = recipientName?.trim();
+  const greeting = greetName ? `Hi ${greetName},` : "Hi there,";
+  const greetingHtml = escapeHtml(greeting);
+
+  const subject = `${referrerName} invited you to Sloanopedia`;
+
+  const text = [
+    greeting,
+    ``,
+    `${referrerName} invited you to join Sloanopedia — the private directory for the MIT Sloan Class of 2026.`,
+    ``,
+    `Claim your profile:`,
+    referralUrl,
+    ``,
+    `Sloanopedia is class-members-only. You'll sign in with a 6-digit code emailed to your @mit.edu, @sloan.mit.edu, or @alum.mit.edu address.`,
+    ``,
+    `Sent because ${referrerName} entered your address on Sloanopedia.`,
+  ].join("\n");
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:0; background-color:${EMAIL.cream}; -webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${EMAIL.cream};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px; max-width:480px;">
+          <tr>
+            <td style="background-color:${EMAIL.paper}; border:1px solid ${EMAIL.line}; border-radius:6px; padding:32px;">
+              <p style="margin:0 0 14px 0; font-family:${MONO}; font-size:11px; line-height:1; letter-spacing:0.14em; text-transform:uppercase; color:${EMAIL.coral};">
+                MIT Sloan Class of 2026
+              </p>
+              <h1 style="margin:0 0 16px 0; font-family:${SANS}; font-size:22px; line-height:1.25; font-weight:600; letter-spacing:-0.01em; color:${EMAIL.ink};">
+                You&rsquo;re invited to Sloanopedia
+              </h1>
+              <p style="margin:0 0 12px 0; font-family:${SANS}; font-size:15px; line-height:1.5; color:${EMAIL.ink};">
+                ${greetingHtml}
+              </p>
+              <p style="margin:0 0 8px 0; font-family:${SANS}; font-size:15px; line-height:1.5; color:${EMAIL.ink2};">
+                <strong style="color:${EMAIL.ink};">${name}</strong> invited you to join Sloanopedia &mdash; the private directory for the MIT Sloan Class of 2026. Profiles, a class map, and a searchable directory to keep the cohort connected after graduation.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+                <tr>
+                  <td align="center" bgcolor="${EMAIL.ink}" style="border-radius:6px;">
+                    <a href="${url}" target="_blank" style="display:inline-block; padding:12px 24px; font-family:${SANS}; font-size:14px; font-weight:600; line-height:1; color:${EMAIL.cream}; text-decoration:none; border-radius:6px;">
+                      Claim your profile &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 4px 0; font-family:${SANS}; font-size:12px; line-height:1.5; color:${EMAIL.ink3};">
+                Or paste this link into your browser:
+              </p>
+              <p style="margin:0 0 24px 0; font-family:${MONO}; font-size:12px; line-height:1.5; word-break:break-all;">
+                <a href="${url}" target="_blank" style="color:${EMAIL.coralDark}; text-decoration:underline;">${url}</a>
+              </p>
+              <div style="border-top:1px solid ${EMAIL.line}; font-size:0; line-height:0;">&nbsp;</div>
+              <p style="margin:18px 0 0 0; font-family:${MONO}; font-size:11px; line-height:1.6; color:${EMAIL.ink3};">
+                Sloanopedia is class-members-only. You&rsquo;ll sign in with a 6-digit code emailed to your @mit.edu, @sloan.mit.edu, or @alum.mit.edu address.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 8px 0 8px;">
+              <p style="margin:0; font-family:${SANS}; font-size:11px; line-height:1.5; color:${EMAIL.ink3};">
+                Sent because ${name} entered your address on Sloanopedia.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, text, html };
 }
