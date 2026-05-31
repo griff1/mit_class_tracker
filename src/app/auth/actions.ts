@@ -1,7 +1,18 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+
+// Referral code cookie. Set in requestLoginCode when the sign-in form
+// carries a `ref` value (forwarded from /sign-in?ref=... -- the invite
+// link). Read + cleared in verifyEmailOtp after the OTP succeeds and the
+// session is live; passed to the redeem_referral_code RPC so the SPECIFIC
+// referral whose code was used gets credited (not every pending referral
+// for this email). HTTP-only + same-site lax so it survives the
+// cross-step navigation but is not reachable from JS.
+const REF_COOKIE = "sloanopedia_ref";
+const REF_COOKIE_MAX_AGE = 60 * 60; // 1 hour, comfortably longer than OTP TTL
 
 // Sign-in/sign-up is a 6-digit emailed code, NOT a magic link. Every user is
 // on MIT Microsoft 365, whose Safe Links scanner pre-fetches inbound URLs and
@@ -18,9 +29,24 @@ export async function requestLoginCode(formData: FormData) {
   const email = String(formData.get("email") ?? "")
     .toLowerCase()
     .trim();
+  const ref = String(formData.get("ref") ?? "").trim();
 
   if (!email) {
     redirect(`/sign-in?error=${encodeURIComponent("Email is required.")}`);
+  }
+
+  // Persist the referral code BEFORE any redirect so it survives the
+  // multi-step flow (email → verify → session live). The redeem RPC is
+  // called from verifyEmailOtp once the OTP succeeds.
+  if (ref) {
+    const store = await cookies();
+    store.set(REF_COOKIE, ref, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: REF_COOKIE_MAX_AGE,
+    });
   }
 
   // No app-side domain check by design: the before_user_created hook is the
@@ -96,6 +122,21 @@ export async function verifyEmailOtp(formData: FormData) {
 
   if (error) {
     back("That code is invalid or expired. Request a new one.");
+  }
+
+  // OTP verified, session is live. If the sign-in started from a referral
+  // link, redeem the code now and clear the cookie. The RPC silently
+  // returns false on any failed check (wrong email, returning user,
+  // already-credited, unknown code) so this never blocks sign-in.
+  const store = await cookies();
+  const ref = store.get(REF_COOKIE)?.value;
+  if (ref) {
+    try {
+      await supabase.rpc("redeem_referral_code", { p_code: ref });
+    } catch {
+      // Best-effort; session already live, don't surface to the user.
+    }
+    store.delete(REF_COOKIE);
   }
 
   redirect("/");

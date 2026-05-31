@@ -1,14 +1,45 @@
+import { cookies } from "next/headers";
 import { requestLoginCode, verifyEmailOtp } from "@/app/auth/actions";
 import { FieldRow } from "@/components/field-row";
 import { Input } from "@/components/inputs";
+import { createClient } from "@/lib/supabase/server";
+
+// Must match REF_COOKIE in src/app/auth/actions.ts. Only read here -- this
+// page never sets it.
+const REF_COOKIE = "sloanopedia_ref";
 
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; step?: string; email?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    step?: string;
+    email?: string;
+    ref?: string;
+  }>;
 }) {
-  const { error, step, email } = await searchParams;
+  const { error, step, email, ref } = await searchParams;
   const showVerify = step === "verify" && !!email;
+
+  // Look up the inviter's display name when we have a referral code.
+  // URL param wins for the initial visit (?ref=…). After the form submits
+  // the code lives in the cookie (requestLoginCode strips ref from the
+  // redirect URL), so the verify step reads it from there. Failure is
+  // silent -- a stale/unknown code just hides the banner.
+  const codeForLookup =
+    ref?.trim() || (await cookies()).get(REF_COOKIE)?.value || null;
+  let inviter: string | null = null;
+  if (codeForLookup) {
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.rpc("referrer_name_for_code", {
+        p_code: codeForLookup,
+      });
+      inviter = typeof data === "string" && data.length > 0 ? data : null;
+    } catch {
+      // Treat as no inviter; never block sign-in.
+    }
+  }
 
   if (showVerify) {
     return (
@@ -26,6 +57,7 @@ export default async function SignInPage({
             an hour.
           </p>
         </header>
+        {inviter && <InviteBanner inviter={inviter} />}
         {error && (
           <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
             {error}
@@ -98,6 +130,7 @@ export default async function SignInPage({
           alumni: use whichever address you sign in with now.
         </p>
       </header>
+      {inviter && <InviteBanner inviter={inviter} />}
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
           {error}
@@ -107,6 +140,7 @@ export default async function SignInPage({
         action={requestLoginCode}
         className="rounded-md border border-line bg-paper px-5 py-4"
       >
+        {ref && <input type="hidden" name="ref" value={ref} />}
         <FieldRow label="Email">
           <Input
             name="email"
@@ -114,6 +148,7 @@ export default async function SignInPage({
             required
             placeholder="you@mit.edu"
             autoComplete="email"
+            defaultValue={email ?? ""}
           />
         </FieldRow>
         <div className="mt-4 flex justify-end border-t border-line pt-3">
@@ -126,5 +161,14 @@ export default async function SignInPage({
         </div>
       </form>
     </main>
+  );
+}
+
+function InviteBanner({ inviter }: { inviter: string }) {
+  return (
+    <p className="rounded-md border border-brand-100 bg-brand-50/60 px-3 py-2 text-sm text-ink">
+      <span className="font-medium">{inviter}</span> is inviting you to join
+      Sloanopedia.
+    </p>
   );
 }

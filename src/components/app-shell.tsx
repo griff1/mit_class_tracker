@@ -4,12 +4,18 @@ import { signOut } from "@/app/auth/actions";
 import { Avatar } from "@/components/avatar";
 import type { Viewer } from "@/lib/viewer";
 
-type SectionKey = "home" | "directory" | "stats" | "profile";
+type SectionKey =
+  | "home"
+  | "directory"
+  | "stats"
+  | "referrals"
+  | "profile";
 
 const SECTIONS: { key: SectionKey; href: string; label: string; available: boolean }[] = [
   { key: "home", href: "/", label: "Home", available: true },
   { key: "directory", href: "/directory", label: "Directory", available: true },
   { key: "stats", href: "/stats", label: "Stats", available: true },
+  { key: "referrals", href: "/referrals", label: "Referrals", available: true },
   { key: "profile", href: "/profile", label: "Profile", available: true },
 ];
 
@@ -59,7 +65,7 @@ export function AppShell({
             Sign out
           </button>
         </form>
-        <ul className="col-span-2 flex items-center justify-center gap-4 text-sm sm:order-2 sm:gap-5">
+        <ul className="col-span-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-sm sm:order-2 sm:flex-nowrap sm:gap-5">
           {SECTIONS.map((s) => {
             const isActive = s.key === active;
             const baseClass = isActive
