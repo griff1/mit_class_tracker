@@ -114,23 +114,29 @@ export default async function Home() {
     // The directory card still shows each member's actual answer; only the
     // map merges. Extend METRO_OF when other metros (NY/NJ, SF Bay, etc.)
     // start showing the same Boston/Cambridge pattern.
-    const byMetro = new Map<string, string[]>();
+    //
+    // Inner map keys by mit_email (unique per profile) so a profile that
+    // lists multiple cities collapsing into the same metro -- e.g. both
+    // "Boston, MA" and "Cambridge, MA" -- shows up ONCE on the merged
+    // pin instead of N times. The Map.set is idempotent; subsequent
+    // hits for the same profile just overwrite their slot.
+    const byMetro = new Map<string, Map<string, string>>();
     for (const r of cityRows ?? []) {
+      const email = (r.mit_email as string | null) ?? "";
       const display =
-        ((r.name as string | null)?.trim() ||
-          (r.mit_email as string | null)) ??
-        "Member";
+        ((r.name as string | null)?.trim() || email) || "Member";
+      const dedupKey = email || display;
       for (const c of (r[field] as string[] | null) ?? []) {
         const metro = METRO_OF[c] ?? c;
-        const list = byMetro.get(metro) ?? [];
-        list.push(display);
-        byMetro.set(metro, list);
+        const bucket = byMetro.get(metro) ?? new Map<string, string>();
+        bucket.set(dedupKey, display);
+        byMetro.set(metro, bucket);
       }
     }
     const mapped: MapAggregate[] = [];
     const unmapped: { city: string; count: number }[] = [];
-    for (const [city, people] of byMetro.entries()) {
-      people.sort((a, b) =>
+    for (const [city, peopleMap] of byMetro.entries()) {
+      const people = Array.from(peopleMap.values()).sort((a, b) =>
         a.localeCompare(b, undefined, { sensitivity: "base" }),
       );
       const coords = coordsByKey.get(city.trim().toLowerCase());
