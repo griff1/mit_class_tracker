@@ -1,14 +1,22 @@
-import { Chip } from "@/components/chip";
+"use client";
+
+import { useMemo, useState } from "react";
 import { Input } from "@/components/inputs";
 
 /**
- * A multi-select chip group where the user can also type in a new value not
- * yet in the list. The hidden text input ships as a separate form field
- * (`newName`); the server action merges it with the chip values and resolves
- * canonical casing against the cohort.
+ * A multi-select chip group where the user can also type in a value not yet in
+ * the list. As they type, existing options that partially match are surfaced as
+ * suggestions, so a near-duplicate ("Boston") gets steered onto the canonical
+ * entry ("Boston, MA") instead of creating a second tag for the same place.
  *
- * `options` should be the union of the seed list and all currently-known
- * cohort values — render-time canonical dedup happens inside.
+ * Form contract (unchanged, so the server action is untouched):
+ *   - every selected value ships as a `name` field (one per chip)
+ *   - any leftover, un-added text in the box ships as the `newName` field
+ * `resolveCanonical` on the server still does the final case-insensitive dedup.
+ *
+ * `options` should be the union of the seed list and all currently-known cohort
+ * values. This is a client component (interactive); it is used only on the
+ * profile edit form, not on the JS-less directory filters.
  */
 export function EditableChipGroup({
   name,
@@ -23,43 +31,175 @@ export function EditableChipGroup({
   selected: readonly string[] | null | undefined;
   newPlaceholder?: string;
 }) {
-  // A column whose migration hasn't been applied yet will arrive as undefined
-  // from Supabase; default to empty so the page still renders.
-  const safeSelected = selected ?? [];
-  // Union of options + selected, case-insensitive, first-seen casing wins.
-  // Selected values not in `options` (e.g. user's previous custom adds) still
-  // render as chips so they can be unchecked.
-  const seen = new Map<string, string>();
-  for (const v of options) {
-    const k = v.toLowerCase();
-    if (!seen.has(k)) seen.set(k, v);
-  }
-  for (const v of safeSelected) {
-    const k = v.toLowerCase();
-    if (!seen.has(k)) seen.set(k, v);
-  }
-  const canonical = Array.from(seen.values()).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  // The known universe: lowercase key -> canonical display. First-seen casing
+  // wins, seed/cohort options before the user's previously-saved values.
+  const universe = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const v of options) {
+      const k = v.toLowerCase();
+      if (!seen.has(k)) seen.set(k, v);
+    }
+    for (const v of selected ?? []) {
+      const k = v.toLowerCase();
+      if (!seen.has(k)) seen.set(k, v);
+    }
+    return seen;
+  }, [options, selected]);
+
+  // Selected values are controlled state, initialized from the saved row.
+  const [chosen, setChosen] = useState<string[]>(() => {
+    const seen = new Map<string, string>();
+    for (const v of selected ?? []) {
+      const k = v.toLowerCase();
+      if (!seen.has(k)) seen.set(k, v);
+    }
+    return Array.from(seen.values());
+  });
+  const [query, setQuery] = useState("");
+
+  const chosenKeys = useMemo(
+    () => new Set(chosen.map((s) => s.toLowerCase())),
+    [chosen],
   );
-  const selectedLower = new Set(safeSelected.map((s) => s.toLowerCase()));
+
+  // The chip palette: every known option plus any freshly-added value, sorted,
+  // so the full set stays browsable and newly-created tags render immediately.
+  const palette = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const v of universe.values()) {
+      const k = v.toLowerCase();
+      if (!seen.has(k)) seen.set(k, v);
+    }
+    for (const v of chosen) {
+      const k = v.toLowerCase();
+      if (!seen.has(k)) seen.set(k, v);
+    }
+    return Array.from(seen.values()).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }, [universe, chosen]);
+
+  const q = query.trim();
+  const ql = q.toLowerCase();
+  const exactExists = ql ? universe.has(ql) || chosenKeys.has(ql) : false;
+
+  // Partial matches: not-yet-chosen options whose label contains the query,
+  // prefix matches ranked first. Capped so the list stays scannable.
+  const suggestions = useMemo(() => {
+    if (!ql) return [];
+    const starts: string[] = [];
+    const includes: string[] = [];
+    for (const v of palette) {
+      const lk = v.toLowerCase();
+      if (chosenKeys.has(lk)) continue;
+      const idx = lk.indexOf(ql);
+      if (idx === 0) starts.push(v);
+      else if (idx > 0) includes.push(v);
+    }
+    return [...starts, ...includes].slice(0, 8);
+  }, [palette, chosenKeys, ql]);
+
+  function add(display: string) {
+    const k = display.toLowerCase();
+    setChosen((prev) =>
+      prev.some((s) => s.toLowerCase() === k)
+        ? prev
+        : [...prev, universe.get(k) ?? display],
+    );
+    setQuery("");
+  }
+
+  function toggle(display: string) {
+    const k = display.toLowerCase();
+    setChosen((prev) =>
+      prev.some((s) => s.toLowerCase() === k)
+        ? prev.filter((s) => s.toLowerCase() !== k)
+        : [...prev, universe.get(k) ?? display],
+    );
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    // Never let Enter submit the whole profile form from inside the add box.
+    e.preventDefault();
+    if (!q) return;
+    if (exactExists) {
+      add(universe.get(ql) ?? q);
+    } else if (suggestions.length === 1) {
+      // Exactly one existing match — take it (the "Boston" -> "Boston, MA" case).
+      add(suggestions[0]);
+    } else if (suggestions.length === 0) {
+      // Genuinely new value.
+      add(q);
+    }
+    // If several options match, do nothing: let the user click the one they mean.
+  }
 
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-wrap gap-1.5">
-        {canonical.map((opt) => (
-          <Chip
-            key={opt}
-            name={name}
-            value={opt}
-            defaultChecked={selectedLower.has(opt.toLowerCase())}
-          />
-        ))}
+        {palette.map((opt) => {
+          const checked = chosenKeys.has(opt.toLowerCase());
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => toggle(opt)}
+              aria-pressed={checked}
+              className={`inline-block select-none rounded-sm border px-2 py-0.5 font-mono text-[0.65rem] lowercase uppercase tracking-[0.1em] transition ${
+                checked
+                  ? "border-brand-100 bg-brand-50 text-brand-700"
+                  : "border-line text-ink-2 hover:border-brand-300"
+              }`}
+            >
+              {opt}
+            </button>
+          );
+        })}
       </div>
-      <Input
-        name={newName}
-        type="text"
-        placeholder={newPlaceholder ?? "Or add a new one"}
-      />
+
+      {/* Hidden fields carry the actual form payload. Selected -> `name`,
+          leftover typed text -> `newName` (server resolves canonical casing). */}
+      {chosen.map((v) => (
+        <input key={v} type="hidden" name={name} value={v} />
+      ))}
+
+      <div className="flex flex-col gap-1">
+        <Input
+          name={newName}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder={newPlaceholder ?? "Search or add a new one"}
+          autoComplete="off"
+        />
+        {q && (suggestions.length > 0 || !exactExists) && (
+          <div className="overflow-hidden rounded border border-line bg-paper">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => add(s)}
+                className="block w-full px-2.5 py-1.5 text-left text-sm text-ink transition hover:bg-cream"
+              >
+                {s}
+              </button>
+            ))}
+            {!exactExists && (
+              <button
+                type="button"
+                onClick={() => add(q)}
+                className={`block w-full px-2.5 py-1.5 text-left text-sm text-brand-700 transition hover:bg-cream ${
+                  suggestions.length > 0 ? "border-t border-line" : ""
+                }`}
+              >
+                + Add “{q}” as new
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
