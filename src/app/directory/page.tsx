@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { avatarSrc } from "@/lib/avatar";
 import { getViewer } from "@/lib/viewer";
 import {
   ACTIVITIES,
@@ -152,23 +153,11 @@ export default async function DirectoryPage({
 
   const { data: profiles, error } = await query.returns<DirectoryRow[]>();
 
-  // Batch-sign photo URLs for the visible profiles (one round trip instead of
-  // N). createSignedUrls returns results in the same order as the input paths.
-  const photoPaths = (profiles ?? [])
-    .map((p) => p.profile_photo_url)
-    .filter((p): p is string => !!p);
-  const photoUrls = new Map<string, string>();
-  if (photoPaths.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from("profile-photos")
-      .createSignedUrls(photoPaths, 3600);
-    if (signed) {
-      for (let i = 0; i < photoPaths.length; i++) {
-        const url = signed[i]?.signedUrl;
-        if (url) photoUrls.set(photoPaths[i], url);
-      }
-    }
-  }
+  // Avatars are served via the stable, cacheable /avatar/[id] proxy (see
+  // src/lib/avatar.ts). No Storage round trip here at all — we just build the
+  // URL from the id + content-addressed path. This replaced per-render
+  // createSignedUrls, whose rotating tokens defeated all caching and were the
+  // main source of Supabase egress.
 
   const hasFilters = !!(
     q ||
@@ -320,11 +309,7 @@ export default async function DirectoryPage({
                 <ProfileCard
                   key={p.id}
                   profile={p}
-                  photoUrl={
-                    p.profile_photo_url
-                      ? photoUrls.get(p.profile_photo_url)
-                      : null
-                  }
+                  photoUrl={avatarSrc(p.id, p.profile_photo_url)}
                 />
               ))}
             </ul>

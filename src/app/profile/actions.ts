@@ -1,8 +1,10 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeCity } from "@/lib/geocode";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, PROGRAMS, ROLES } from "@/lib/types";
@@ -115,15 +117,41 @@ export async function updateProfile(formData: FormData) {
       );
     }
 
-    // Single path per user — upsert overwrites the previous photo. Content
-    // type is preserved as metadata so the right MIME is served regardless
-    // of the URL extension (we don't store one).
-    const path = `${user.id}/avatar`;
+    // Resize + recompress before storing. Phone uploads run multiple MB and
+    // were previously served at full resolution into a 56px avatar — that
+    // full-size, uncacheable delivery is what blew through the Supabase egress
+    // quota. A 256px WebP avatar is ~20–40KB. .rotate() bakes in EXIF
+    // orientation so portrait phone photos don't end up sideways once the
+    // orientation tag is dropped by re-encoding.
+    let resized: Buffer;
+    try {
+      const input = Buffer.from(await photoEntry.arrayBuffer());
+      resized = await sharp(input)
+        .rotate()
+        .resize(256, 256, { fit: "cover", position: "centre" })
+        .webp({ quality: 75 })
+        .toBuffer();
+    } catch {
+      redirect(
+        `/profile?error=${encodeURIComponent(
+          "Couldn't process that image. Try a different file.",
+        )}`,
+      );
+    }
+
+    // Content-addressed path: the filename is a hash of the resized bytes, so
+    // the storage path (and therefore the avatar URL) changes only when the
+    // photo actually changes. That lets the /avatar route serve it as
+    // immutable — the caching half of the egress fix. The old fixed
+    // "<id>/avatar" path couldn't be cached because its URL never changed even
+    // when the image did.
+    const hash = createHash("sha256").update(resized).digest("hex").slice(0, 16);
+    const path = `${user.id}/${hash}.webp`;
     const { error: uploadError } = await supabase.storage
       .from("profile-photos")
-      .upload(path, photoEntry, {
+      .upload(path, resized, {
         upsert: true,
-        contentType: photoEntry.type,
+        contentType: "image/webp",
       });
     if (uploadError) {
       redirect(
@@ -201,9 +229,12 @@ export async function updateProfile(formData: FormData) {
   // auto-initiated only when it's newly added or changed — not on every save.
   const { data: prev } = await supabase
     .from("profiles")
-    .select("personal_email")
+    .select("personal_email, profile_photo_url")
     .eq("id", user.id)
-    .maybeSingle<{ personal_email: string | null }>();
+    .maybeSingle<{
+      personal_email: string | null;
+      profile_photo_url: string | null;
+    }>();
 
   const { error } = await supabase
     .from("profiles")
@@ -212,6 +243,20 @@ export async function updateProfile(formData: FormData) {
 
   if (error) {
     redirect(`/profile?error=${encodeURIComponent(error.message)}`);
+  }
+
+  // Best-effort cleanup of the previous avatar object now that the row points
+  // at the new content-addressed path. Without this, orphaned objects would
+  // accumulate (one per upload) since the path is no longer a fixed
+  // "<id>/avatar" that upsert overwrote in place.
+  if (
+    photoPath &&
+    prev?.profile_photo_url &&
+    prev.profile_photo_url !== photoPath
+  ) {
+    await supabase.storage
+      .from("profile-photos")
+      .remove([prev.profile_photo_url]);
   }
 
   revalidatePath("/profile");

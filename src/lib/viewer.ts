@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import type { createClient } from "@/lib/supabase/server";
+import { avatarSrc } from "@/lib/avatar";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -13,8 +14,8 @@ export type Viewer = {
 
 /**
  * Loads the profile fields the AppShell top nav needs (name, optional photo)
- * plus `ocean` for page-header eyebrows. One profile-row query + one optional
- * Storage signed-URL call.
+ * plus `ocean` for page-header eyebrows. One profile-row query; the avatar is
+ * the stable /avatar proxy URL (no Storage call).
  *
  * Returns a Viewer with nulls if the profile row doesn't exist yet — useful
  * for error shells and the moments before the on_auth_user_confirmed trigger
@@ -35,19 +36,11 @@ export async function getViewer(
       profile_photo_url: string | null;
     }>();
 
-  let photoUrl: string | null = null;
-  if (data?.profile_photo_url) {
-    const { data: signed } = await supabase.storage
-      .from("profile-photos")
-      .createSignedUrl(data.profile_photo_url, 3600);
-    photoUrl = signed?.signedUrl ?? null;
-  }
-
   return {
     name: data?.name ?? null,
     email: user.email!,
     personalEmail: data?.personal_email ?? null,
     ocean: data?.ocean ?? null,
-    photoUrl,
+    photoUrl: avatarSrc(user.id, data?.profile_photo_url),
   };
 }

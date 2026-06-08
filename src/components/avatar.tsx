@@ -1,11 +1,15 @@
+import Image from "next/image";
 import { OCEAN_FLAG } from "@/lib/oceans";
 
 type Size = "sm" | "md" | "lg";
 
-const SIZES: Record<Size, { box: string; text: string; notch: string }> = {
-  sm: { box: "h-8 w-8", text: "text-xs", notch: "h-3 w-3 -bottom-0.5 -right-0.5" },
-  md: { box: "h-10 w-10", text: "text-sm", notch: "h-3.5 w-3.5 -bottom-1 -right-1" },
-  lg: { box: "h-14 w-14", text: "text-lg", notch: "h-4 w-4 -bottom-1 -right-1" },
+const SIZES: Record<
+  Size,
+  { box: string; text: string; notch: string; px: string }
+> = {
+  sm: { box: "h-8 w-8", text: "text-xs", notch: "h-3 w-3 -bottom-0.5 -right-0.5", px: "32px" },
+  md: { box: "h-10 w-10", text: "text-sm", notch: "h-3.5 w-3.5 -bottom-1 -right-1", px: "40px" },
+  lg: { box: "h-14 w-14", text: "text-lg", notch: "h-4 w-4 -bottom-1 -right-1", px: "56px" },
 };
 
 export function Avatar({
@@ -28,11 +32,18 @@ export function Avatar({
       className={`relative ${s.box} flex flex-none items-center justify-center rounded-md bg-ink ${s.text} font-semibold tracking-tight text-cream`}
     >
       {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // `unoptimized`: the source is the auth-gated /avatar proxy, already
+        // sized + WebP-encoded at upload. The Vercel image optimizer fetches
+        // sources server-side without the user's cookies and would 401, so we
+        // skip it and let the browser fetch the proxy directly. next/image
+        // still gives us lazy-loading (default) and no layout shift.
+        <Image
           src={photoUrl}
           alt=""
-          className="absolute inset-0 h-full w-full rounded-md object-cover"
+          fill
+          sizes={s.px}
+          unoptimized
+          className="rounded-md object-cover"
         />
       ) : (
         initial

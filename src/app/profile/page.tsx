@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { avatarSrc } from "@/lib/avatar";
 import {
   ACTIVITIES,
   CITIES,
@@ -83,16 +84,9 @@ export default async function ProfilePage({
     new Set((cohort ?? []).flatMap((r) => (r.activities as string[] | null) ?? [])),
   );
 
-  // Signed URL for the current photo so the form can render a preview.
-  // Paths are stored in profile_photo_url; signed URLs are generated per
-  // render with a 1-hour expiry.
-  let photoUrl: string | null = null;
-  if (profile.profile_photo_url) {
-    const { data: signed } = await supabase.storage
-      .from("profile-photos")
-      .createSignedUrl(profile.profile_photo_url, 3600);
-    photoUrl = signed?.signedUrl ?? null;
-  }
+  // Avatar preview via the stable, cacheable /avatar proxy (see
+  // src/lib/avatar.ts) — no per-render Storage signing.
+  const photoUrl = avatarSrc(user.id, profile.profile_photo_url);
 
   const displayName = profile.name?.trim() || profile.mit_email;
   const transitionPending =
