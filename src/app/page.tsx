@@ -6,14 +6,79 @@ import { PageHeader } from "@/components/page-header";
 import { ClassMap, type MapAggregate } from "@/components/class-map";
 
 // Cities that should collapse onto a parent metro's pin on the home map.
-// Keys are exact canonical city strings (as stored in `profiles.cities` /
-// `visiting_cities`); values are the metro hub whose coords + label win.
-// Only the map merges — the directory card and stats keep each member's
-// own city. Extend as other metros (NY-area outer boroughs, SF Bay, etc.)
-// start producing the same Boston/Cambridge fragmentation.
+// Keys are LOWERCASED city strings (matched case-insensitively against the raw
+// values in `profiles.cities` / `visiting_cities`); values are the metro hub
+// whose coords + label win. Only the map merges — the directory card and stats
+// keep each member's own city. Extend as other metros (NY-area outer boroughs,
+// etc.) start producing the same fragmentation.
+//
+// Both ", CA"-suffixed and bare write-in variants are listed for the common
+// Bay Area names, since members type either form. The hub label "Bay Area, CA"
+// is never itself a profile city, so its coords are seeded in
+// city_coords (migration 20260608170000), the way "cambridge, ma" was.
 const METRO_OF: Record<string, string> = {
-  "Cambridge, MA": "Boston, MA",
+  // Greater Boston.
+  "cambridge, ma": "Boston, MA",
+  // SF Bay Area — SF, Peninsula, South Bay, and East Bay all collapse to one pin.
+  "san francisco, ca": "Bay Area, CA",
+  "san francisco": "Bay Area, CA",
+  "sf": "Bay Area, CA",
+  "bay area": "Bay Area, CA",
+  "bay area, ca": "Bay Area, CA",
+  "sf bay area": "Bay Area, CA",
+  "south san francisco, ca": "Bay Area, CA",
+  "daly city, ca": "Bay Area, CA",
+  "san bruno, ca": "Bay Area, CA",
+  "burlingame, ca": "Bay Area, CA",
+  "san mateo, ca": "Bay Area, CA",
+  "foster city, ca": "Bay Area, CA",
+  "belmont, ca": "Bay Area, CA",
+  "san carlos, ca": "Bay Area, CA",
+  "redwood city, ca": "Bay Area, CA",
+  "redwood city": "Bay Area, CA",
+  "menlo park, ca": "Bay Area, CA",
+  "menlo park": "Bay Area, CA",
+  "east palo alto, ca": "Bay Area, CA",
+  "palo alto, ca": "Bay Area, CA",
+  "palo alto": "Bay Area, CA",
+  "mountain view, ca": "Bay Area, CA",
+  "mountain view": "Bay Area, CA",
+  "los altos, ca": "Bay Area, CA",
+  "sunnyvale, ca": "Bay Area, CA",
+  "sunnyvale": "Bay Area, CA",
+  "cupertino, ca": "Bay Area, CA",
+  "cupertino": "Bay Area, CA",
+  "santa clara, ca": "Bay Area, CA",
+  "santa clara": "Bay Area, CA",
+  "san jose, ca": "Bay Area, CA",
+  "san jose": "Bay Area, CA",
+  "campbell, ca": "Bay Area, CA",
+  "los gatos, ca": "Bay Area, CA",
+  "milpitas, ca": "Bay Area, CA",
+  "fremont, ca": "Bay Area, CA",
+  "hayward, ca": "Bay Area, CA",
+  "san leandro, ca": "Bay Area, CA",
+  "alameda, ca": "Bay Area, CA",
+  "oakland, ca": "Bay Area, CA",
+  "oakland": "Bay Area, CA",
+  "emeryville, ca": "Bay Area, CA",
+  "berkeley, ca": "Bay Area, CA",
+  "berkeley": "Bay Area, CA",
+  "richmond, ca": "Bay Area, CA",
+  "walnut creek, ca": "Bay Area, CA",
+  "pleasanton, ca": "Bay Area, CA",
+  "dublin, ca": "Bay Area, CA",
+  "san ramon, ca": "Bay Area, CA",
+  "novato, ca": "Bay Area, CA",
+  "san rafael, ca": "Bay Area, CA",
+  "sausalito, ca": "Bay Area, CA",
 };
+
+// Resolve a raw city string to its metro hub, or itself when unmapped.
+// Case-insensitive so "san francisco, ca" and "San Francisco, CA" both collapse.
+function metroOf(city: string): string {
+  return METRO_OF[city.trim().toLowerCase()] ?? city;
+}
 
 export default async function Home() {
   const supabase = await createClient();
@@ -80,12 +145,14 @@ export default async function Home() {
   // (e.g. the migration has not been applied yet).
   const allCityKeys = new Set<string>();
   for (const r of cityRows ?? []) {
-    for (const c of (r.cities as string[] | null) ?? []) {
-      const k = c.trim().toLowerCase();
-      if (k) allCityKeys.add(k);
-    }
-    for (const c of (r.visiting_cities as string[] | null) ?? []) {
-      const k = c.trim().toLowerCase();
+    for (const c of [
+      ...((r.cities as string[] | null) ?? []),
+      ...((r.visiting_cities as string[] | null) ?? []),
+    ]) {
+      // Key by the metro hub the city collapses to, so a hub that is never a
+      // raw profile city itself (e.g. "Bay Area, CA") still has its coords
+      // fetched. For unmapped cities metroOf is the identity.
+      const k = metroOf(c).trim().toLowerCase();
       if (k) allCityKeys.add(k);
     }
   }
@@ -127,7 +194,7 @@ export default async function Home() {
         ((r.name as string | null)?.trim() || email) || "Member";
       const dedupKey = email || display;
       for (const c of (r[field] as string[] | null) ?? []) {
-        const metro = METRO_OF[c] ?? c;
+        const metro = metroOf(c);
         const bucket = byMetro.get(metro) ?? new Map<string, string>();
         bucket.set(dedupKey, display);
         byMetro.set(metro, bucket);
