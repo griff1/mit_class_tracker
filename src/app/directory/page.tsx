@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { avatarSrc } from "@/lib/avatar";
+import { canonKey } from "@/lib/cities";
 import { getViewer } from "@/lib/viewer";
 import {
   ACTIVITIES,
@@ -65,7 +66,7 @@ function pgArrayLiteral(values: readonly string[]): string {
 function unionCanonical(seed: readonly string[], cohort: string[]): string[] {
   const seen = new Map<string, string>();
   for (const v of [...seed, ...cohort]) {
-    const k = v.toLowerCase();
+    const k = canonKey(v);
     if (!seen.has(k)) seen.set(k, v);
   }
   return Array.from(seen.values()).sort((a, b) =>

@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeCity } from "@/lib/geocode";
 import { ACTIVITIES, CITIES, INDUSTRIES, OCEANS, PROGRAMS, ROLES } from "@/lib/types";
+import { CITY_ALIASES, canonKey } from "@/lib/cities";
 import { safeEmail, safeLinkedInUrl } from "@/lib/url-safety";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -40,12 +41,18 @@ function manyStrings(values: FormDataEntryValue[]): string[] {
 
 /**
  * Resolves a user-submitted set of values (chip selections + optional new
- * write-in) against the cohort's existing canonical entries. Case-insensitive:
- * if the new write-in matches an existing entry by lowercase, we keep the
- * existing casing instead of introducing a duplicate.
+ * write-in) against the cohort's existing canonical entries.
  *
- * Returns a deduped array in the order: chips first, then the new value if it
- * survived as a fresh entry.
+ * Keys are `canonKey` — accent-, case-, and whitespace-insensitive — so e.g.
+ * "Sao Paulo" and "São Paulo" collapse to one entry. For city columns a
+ * curated `CITY_ALIASES` map also folds bare/variant names ("Cambridge" ->
+ * "Cambridge, MA", "Sao Paulo" -> "São Paulo, Brazil") onto the canonical seed
+ * form, which both dedups them and lets them geocode correctly. Dedup is by the
+ * *resolved display's* key, so two variants that map to the same canonical
+ * (e.g. "Sao Paulo" and "Sao Paulo, Brazil") collapse to a single entry.
+ *
+ * Seed entries are considered before cohort write-ins so the curated casing
+ * (e.g. the accented "São Paulo, Brazil") wins over a cohort variant.
  */
 async function resolveCanonical(
   supabase: ServerClient,
@@ -58,27 +65,28 @@ async function resolveCanonical(
   const cohort = ((data ?? []) as Array<Record<string, unknown>>).flatMap(
     (r) => (r[column] as string[] | null) ?? [],
   );
+  const isCity = column === "cities" || column === "visiting_cities";
 
-  // Build canonical map (lowercase key → display value). First-seen wins.
+  // Canonical display per normalized key. Seed first so curated casing wins.
   const canonical = new Map<string, string>();
-  for (const v of [...cohort, ...seed]) {
-    const k = v.toLowerCase();
+  for (const v of [...seed, ...cohort]) {
+    const k = canonKey(v);
     if (!canonical.has(k)) canonical.set(k, v);
   }
 
   const result = new Map<string, string>();
-  for (const c of chips) {
-    const trimmed = c.trim();
-    if (!trimmed) continue;
-    const k = trimmed.toLowerCase();
-    const display = canonical.get(k) ?? trimmed;
-    if (!result.has(k)) result.set(k, display);
-  }
-  if (newValue) {
-    const k = newValue.toLowerCase();
-    const display = canonical.get(k) ?? newValue;
-    if (!result.has(k)) result.set(k, display);
-  }
+  const add = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const display =
+      (isCity ? CITY_ALIASES[canonKey(trimmed)] : undefined) ??
+      canonical.get(canonKey(trimmed)) ??
+      trimmed;
+    const displayKey = canonKey(display);
+    if (!result.has(displayKey)) result.set(displayKey, display);
+  };
+  for (const c of chips) add(c);
+  if (newValue) add(newValue);
   return Array.from(result.values());
 }
 

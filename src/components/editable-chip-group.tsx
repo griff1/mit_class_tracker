@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Input } from "@/components/inputs";
+import { canonKey } from "@/lib/cities";
 
 /**
  * A multi-select chip group where the user can also type in a value not yet in
@@ -9,10 +10,13 @@ import { Input } from "@/components/inputs";
  * suggestions, so a near-duplicate ("Boston") gets steered onto the canonical
  * entry ("Boston, MA") instead of creating a second tag for the same place.
  *
+ * Matching is accent-insensitive (via canonKey), so typing "Sao Paulo" still
+ * surfaces "São Paulo, Brazil". The server (resolveCanonical) is the
+ * authoritative backstop and additionally folds known aliases.
+ *
  * Form contract (unchanged, so the server action is untouched):
  *   - every selected value ships as a `name` field (one per chip)
  *   - any leftover, un-added text in the box ships as the `newName` field
- * `resolveCanonical` on the server still does the final case-insensitive dedup.
  *
  * `options` should be the union of the seed list and all currently-known cohort
  * values. This is a client component (interactive); it is used only on the
@@ -31,16 +35,16 @@ export function EditableChipGroup({
   selected: readonly string[] | null | undefined;
   newPlaceholder?: string;
 }) {
-  // The known universe: lowercase key -> canonical display. First-seen casing
+  // The known universe: normalized key -> canonical display. First-seen casing
   // wins, seed/cohort options before the user's previously-saved values.
   const universe = useMemo(() => {
     const seen = new Map<string, string>();
     for (const v of options) {
-      const k = v.toLowerCase();
+      const k = canonKey(v);
       if (!seen.has(k)) seen.set(k, v);
     }
     for (const v of selected ?? []) {
-      const k = v.toLowerCase();
+      const k = canonKey(v);
       if (!seen.has(k)) seen.set(k, v);
     }
     return seen;
@@ -50,7 +54,7 @@ export function EditableChipGroup({
   const [chosen, setChosen] = useState<string[]>(() => {
     const seen = new Map<string, string>();
     for (const v of selected ?? []) {
-      const k = v.toLowerCase();
+      const k = canonKey(v);
       if (!seen.has(k)) seen.set(k, v);
     }
     return Array.from(seen.values());
@@ -58,7 +62,7 @@ export function EditableChipGroup({
   const [query, setQuery] = useState("");
 
   const chosenKeys = useMemo(
-    () => new Set(chosen.map((s) => s.toLowerCase())),
+    () => new Set(chosen.map((s) => canonKey(s))),
     [chosen],
   );
 
@@ -67,11 +71,11 @@ export function EditableChipGroup({
   const palette = useMemo(() => {
     const seen = new Map<string, string>();
     for (const v of universe.values()) {
-      const k = v.toLowerCase();
+      const k = canonKey(v);
       if (!seen.has(k)) seen.set(k, v);
     }
     for (const v of chosen) {
-      const k = v.toLowerCase();
+      const k = canonKey(v);
       if (!seen.has(k)) seen.set(k, v);
     }
     return Array.from(seen.values()).sort((a, b) =>
@@ -80,17 +84,18 @@ export function EditableChipGroup({
   }, [universe, chosen]);
 
   const q = query.trim();
-  const ql = q.toLowerCase();
+  const ql = canonKey(q);
   const exactExists = ql ? universe.has(ql) || chosenKeys.has(ql) : false;
 
-  // Partial matches: not-yet-chosen options whose label contains the query,
-  // prefix matches ranked first. Capped so the list stays scannable.
+  // Partial matches: not-yet-chosen options whose normalized label contains the
+  // normalized query, prefix matches ranked first. Capped so the list stays
+  // scannable.
   const suggestions = useMemo(() => {
     if (!ql) return [];
     const starts: string[] = [];
     const includes: string[] = [];
     for (const v of palette) {
-      const lk = v.toLowerCase();
+      const lk = canonKey(v);
       if (chosenKeys.has(lk)) continue;
       const idx = lk.indexOf(ql);
       if (idx === 0) starts.push(v);
@@ -100,9 +105,9 @@ export function EditableChipGroup({
   }, [palette, chosenKeys, ql]);
 
   function add(display: string) {
-    const k = display.toLowerCase();
+    const k = canonKey(display);
     setChosen((prev) =>
-      prev.some((s) => s.toLowerCase() === k)
+      prev.some((s) => canonKey(s) === k)
         ? prev
         : [...prev, universe.get(k) ?? display],
     );
@@ -110,10 +115,10 @@ export function EditableChipGroup({
   }
 
   function toggle(display: string) {
-    const k = display.toLowerCase();
+    const k = canonKey(display);
     setChosen((prev) =>
-      prev.some((s) => s.toLowerCase() === k)
-        ? prev.filter((s) => s.toLowerCase() !== k)
+      prev.some((s) => canonKey(s) === k)
+        ? prev.filter((s) => canonKey(s) !== k)
         : [...prev, universe.get(k) ?? display],
     );
   }
@@ -139,7 +144,7 @@ export function EditableChipGroup({
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-wrap gap-1.5">
         {palette.map((opt) => {
-          const checked = chosenKeys.has(opt.toLowerCase());
+          const checked = chosenKeys.has(canonKey(opt));
           return (
             <button
               key={opt}
