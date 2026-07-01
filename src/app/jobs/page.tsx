@@ -1,0 +1,235 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/viewer";
+import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
+import { Section } from "@/components/section";
+import { FieldRow } from "@/components/field-row";
+import { Input } from "@/components/inputs";
+import { SubmitButton } from "@/components/submit-button";
+import { submitJob } from "./actions";
+import {
+  JOB_SELECT,
+  JobCard,
+  JobStatusPill,
+  fmtDate,
+  type JobRow,
+} from "./job-card";
+
+export default async function JobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; submitted?: string; error?: string }>;
+}) {
+  const { q: rawQ, submitted, error } = await searchParams;
+  const q = (rawQ ?? "").trim();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  const viewer = await getViewer(supabase, user);
+
+  // Approved feed, newest first. Search is a simple ilike across the four
+  // text columns; commas/parens are stripped from the pattern because they
+  // are structural characters in PostgREST's .or() syntax.
+  let feedQuery = supabase
+    .from("job_postings")
+    .select(JOB_SELECT)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+  if (q) {
+    const pat = `%${q.replace(/[,()]/g, " ")}%`;
+    feedQuery = feedQuery.or(
+      `title.ilike.${pat},company.ilike.${pat},location.ilike.${pat},description.ilike.${pat}`,
+    );
+  }
+  const { data: jobs, error: feedError } = await feedQuery.returns<JobRow[]>();
+
+  // The member's own submissions, any status (RLS scopes non-approved
+  // visibility to the poster), so pending/rejected state is visible to them.
+  const { data: mine } = await supabase
+    .from("job_postings")
+    .select("id, title, company, status, created_at")
+    .eq("posted_by", user.id)
+    .order("created_at", { ascending: false })
+    .returns<
+      Pick<JobRow, "id" | "title" | "company" | "status" | "created_at">[]
+    >();
+
+  // Admin? Show the review-queue link with a pending count.
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  let pendingCount = 0;
+  if (isAdmin) {
+    const { count } = await supabase
+      .from("job_postings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    pendingCount = count ?? 0;
+  }
+
+  return (
+    <AppShell active="jobs" user={viewer}>
+      <PageHeader
+        eyebrow="Opportunities from the cohort"
+        title="Jobs"
+        count={
+          jobs
+            ? `${jobs.length} ${jobs.length === 1 ? "posting" : "postings"}`
+            : "—"
+        }
+      />
+
+      {isAdmin && (
+        <Link
+          href="/jobs/review"
+          className="block rounded-md border border-brand-100 bg-brand-50/60 px-4 py-2.5 text-sm text-ink transition hover:bg-brand-50"
+        >
+          <span className="font-medium">Review queue</span> —{" "}
+          {pendingCount === 0
+            ? "no postings waiting."
+            : `${pendingCount} ${
+                pendingCount === 1 ? "posting" : "postings"
+              } waiting for approval.`}{" "}
+          →
+        </Link>
+      )}
+
+      {submitted && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Posting submitted. It goes live once it&apos;s been reviewed —
+          you&apos;ll see its status under &ldquo;Your submissions&rdquo; below.
+        </p>
+      )}
+      {error && (
+        <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
+          {error}
+        </p>
+      )}
+
+      <Section label="Browse" index={1}>
+        <form action="/jobs" method="get" className="flex items-center gap-2">
+          <Input
+            type="text"
+            name="q"
+            defaultValue={q}
+            placeholder="Search title, company, location…"
+          />
+          <button
+            type="submit"
+            className="flex-none rounded-md bg-ink px-3.5 py-2 text-xs font-medium text-cream transition hover:bg-ink-2"
+          >
+            Search
+          </button>
+          {q && (
+            <Link
+              href="/jobs"
+              className="flex-none text-xs text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline"
+            >
+              Clear
+            </Link>
+          )}
+        </form>
+
+        {feedError && (
+          <p className="mt-3 rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
+            Couldn&apos;t load postings: {feedError.message}
+          </p>
+        )}
+        {!feedError && jobs && jobs.length === 0 && (
+          <p className="mt-3 text-sm text-ink-3">
+            {q
+              ? "No postings match that search."
+              : "No postings yet. Share the first one below."}
+          </p>
+        )}
+        {!feedError && jobs && jobs.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-3">
+            {jobs.map((j) => (
+              <JobCard key={j.id} job={j} />
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      <form action={submitJob} className="flex flex-col gap-3">
+        <Section label="Share a job" index={2}>
+          <FieldRow label="Title" help="e.g. Senior Product Manager.">
+            <Input name="title" required maxLength={120} placeholder="Job title" />
+          </FieldRow>
+          <FieldRow label="Company">
+            <Input name="company" required maxLength={120} placeholder="Company" />
+          </FieldRow>
+          <FieldRow label="Location" help="Optional. City / remote / hybrid.">
+            <Input name="location" maxLength={120} placeholder="e.g. NYC or Remote" />
+          </FieldRow>
+          <FieldRow
+            label="Apply link"
+            help="Optional. Must be an http(s) URL — anything else is dropped."
+          >
+            <Input name="apply_url" type="url" placeholder="https://…" />
+          </FieldRow>
+          <FieldRow
+            label="Contact"
+            help="Optional. How interested classmates reach you or the hiring team."
+          >
+            <Input
+              name="contact"
+              maxLength={120}
+              placeholder="e.g. jane@company.com"
+            />
+          </FieldRow>
+          <FieldRow
+            label="Description"
+            help="What the role is, who it fits, anything a classmate should know. Postings are reviewed before going live."
+          >
+            <textarea
+              name="description"
+              required
+              maxLength={5000}
+              rows={6}
+              placeholder="Tell the class about the role…"
+              className="w-full rounded border border-line bg-cream px-3 py-2 text-sm text-ink placeholder:text-ink-3/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            />
+          </FieldRow>
+          <div className="flex justify-end pt-2">
+            <SubmitButton pendingLabel="Submitting…">
+              Submit for review
+            </SubmitButton>
+          </div>
+        </Section>
+      </form>
+
+      {mine && mine.length > 0 && (
+        <Section label="Your submissions" index={3}>
+          <ul className="flex flex-col">
+            {mine.map((j, idx) => (
+              <li
+                key={j.id}
+                className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2 ${
+                  idx === 0 ? "" : "border-t border-line"
+                }`}
+              >
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-medium text-ink">
+                    {j.title}{" "}
+                    <span className="font-normal text-ink-2">
+                      — {j.company}
+                    </span>
+                  </span>
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-3">
+                    submitted {fmtDate(j.created_at)}
+                  </span>
+                </div>
+                <JobStatusPill status={j.status} />
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </AppShell>
+  );
+}

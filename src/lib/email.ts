@@ -98,6 +98,100 @@ const SANS =
 const MONO =
   "'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace";
 
+export type JobAlertEmailInput = {
+  /** Poster's display name (escaped before rendering). */
+  posterName: string;
+  /** Posting title / company (escaped). */
+  title: string;
+  company: string;
+  /** First ~300 chars of the description (escaped). */
+  excerpt: string;
+  /** Absolute URL of the review page. */
+  reviewUrl: string;
+};
+
+/**
+ * Admin alert for a newly submitted job posting awaiting review. Same
+ * Outlook-safe, brand-matched construction as the referral invite (table
+ * layout, inline styles, bulletproof button).
+ */
+export function renderJobAlertEmail({
+  posterName,
+  title,
+  company,
+  excerpt,
+  reviewUrl,
+}: JobAlertEmailInput): { subject: string; text: string; html: string } {
+  const name = escapeHtml(posterName);
+  const t = escapeHtml(title);
+  const co = escapeHtml(company);
+  const ex = escapeHtml(excerpt);
+  const url = escapeHtml(reviewUrl);
+
+  const subject = `Review: ${title} at ${company}`;
+
+  const text = [
+    `${posterName} submitted a job posting on Sloanopedia.`,
+    ``,
+    `${title} — ${company}`,
+    ``,
+    excerpt,
+    ``,
+    `Review it here:`,
+    reviewUrl,
+  ].join("\n");
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:0; background-color:${EMAIL.cream}; -webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${EMAIL.cream};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px; max-width:480px;">
+          <tr>
+            <td style="background-color:${EMAIL.paper}; border:1px solid ${EMAIL.line}; border-radius:6px; padding:32px;">
+              <p style="margin:0 0 14px 0; font-family:${MONO}; font-size:11px; line-height:1; letter-spacing:0.14em; text-transform:uppercase; color:${EMAIL.coral};">
+                Sloanopedia admin
+              </p>
+              <h1 style="margin:0 0 16px 0; font-family:${SANS}; font-size:22px; line-height:1.25; font-weight:600; letter-spacing:-0.01em; color:${EMAIL.ink};">
+                New job posting to review
+              </h1>
+              <p style="margin:0 0 8px 0; font-family:${SANS}; font-size:15px; line-height:1.5; color:${EMAIL.ink2};">
+                <strong style="color:${EMAIL.ink};">${name}</strong> submitted:
+              </p>
+              <p style="margin:0 0 8px 0; font-family:${SANS}; font-size:15px; line-height:1.5; color:${EMAIL.ink};">
+                <strong>${t}</strong> &mdash; ${co}
+              </p>
+              <p style="margin:0 0 8px 0; font-family:${SANS}; font-size:13px; line-height:1.5; color:${EMAIL.ink2};">
+                ${ex}
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="${EMAIL.ink}" style="border-radius:6px;">
+                    <a href="${url}" target="_blank" style="display:inline-block; padding:12px 24px; font-family:${SANS}; font-size:14px; font-weight:600; line-height:1; color:${EMAIL.cream}; text-decoration:none; border-radius:6px;">
+                      Review postings &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, text, html };
+}
+
 export type ReferralEmailInput = {
   /** Inviter's display name (already chosen by the caller; will be escaped). */
   referrerName: string;
