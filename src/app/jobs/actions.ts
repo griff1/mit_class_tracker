@@ -89,6 +89,84 @@ export async function submitJob(formData: FormData) {
   redirect("/jobs?submitted=1");
 }
 
+export async function updateJob(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  // RLS already restricts UPDATE to admins; check explicitly so a non-admin
+  // gets a redirect rather than a silent 0-row no-op.
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  if (!isAdmin) redirect("/jobs");
+
+  const id = trimmed(formData.get("id"));
+  if (!id) redirect("/jobs");
+  const failEdit = (msg: string) =>
+    redirect(`/jobs/${id}/edit?error=${encodeURIComponent(msg)}`);
+
+  const title = trimmed(formData.get("title")).slice(0, MAX_SHORT);
+  const company = trimmed(formData.get("company")).slice(0, MAX_SHORT);
+  const location = trimmed(formData.get("location")).slice(0, MAX_SHORT);
+  const contact = trimmed(formData.get("contact")).slice(0, MAX_SHORT);
+  const description = trimmed(formData.get("description")).slice(
+    0,
+    MAX_DESCRIPTION,
+  );
+  const applyUrl = safeHttpUrl(trimmed(formData.get("apply_url")) || null);
+
+  if (!title) failEdit("Add a job title.");
+  if (!company) failEdit("Add the company name.");
+  if (!description) failEdit("Add a description.");
+
+  // Note: status is intentionally untouched — editing an approved posting
+  // keeps it live; editing a pending one keeps it pending.
+  const { data: updated, error } = await supabase
+    .from("job_postings")
+    .update({
+      title,
+      company,
+      location: location || null,
+      apply_url: applyUrl,
+      contact: contact || null,
+      description,
+    })
+    .eq("id", id)
+    .select("id");
+  if (error || !updated?.length) {
+    failEdit(error?.message ?? "Posting not found — it may have been deleted.");
+  }
+
+  revalidatePath("/jobs");
+  revalidatePath(`/jobs/${id}/edit`);
+  redirect("/jobs?updated=1");
+}
+
+export async function deleteJob(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  // RLS permits delete on own-or-admin rows; this admin management action is
+  // gated to admins (a poster deleting their own is a separate, unused path).
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  if (!isAdmin) redirect("/jobs");
+
+  const id = trimmed(formData.get("id"));
+  if (!id) redirect("/jobs");
+
+  const { error } = await supabase.from("job_postings").delete().eq("id", id);
+  if (error) {
+    redirect(`/jobs/${id}/edit?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/jobs");
+  redirect("/jobs?deleted=1");
+}
+
 export async function reviewJob(formData: FormData) {
   const supabase = await createClient();
   const {

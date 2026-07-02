@@ -5,10 +5,10 @@ import { getViewer } from "@/lib/viewer";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Section } from "@/components/section";
-import { FieldRow } from "@/components/field-row";
 import { Input } from "@/components/inputs";
 import { SubmitButton } from "@/components/submit-button";
 import { submitJob } from "./actions";
+import { JobFields } from "./job-form-fields";
 import {
   JOB_SELECT,
   JobCard,
@@ -20,9 +20,15 @@ import {
 export default async function JobsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; submitted?: string; error?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    submitted?: string;
+    updated?: string;
+    deleted?: string;
+    error?: string;
+  }>;
 }) {
-  const { q: rawQ, submitted, error } = await searchParams;
+  const { q: rawQ, submitted, updated, deleted, error } = await searchParams;
   const q = (rawQ ?? "").trim();
 
   const supabase = await createClient();
@@ -74,7 +80,7 @@ export default async function JobsPage({
   return (
     <AppShell active="jobs" user={viewer}>
       <PageHeader
-        eyebrow="Opportunities from the cohort"
+        eyebrow="Sloanies helping Sloanies"
         title="Jobs"
         count={
           jobs
@@ -102,6 +108,16 @@ export default async function JobsPage({
         <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
           Posting submitted. It goes live once it&apos;s been reviewed —
           you&apos;ll see its status under &ldquo;Your submissions&rdquo; below.
+        </p>
+      )}
+      {updated && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Posting updated.
+        </p>
+      )}
+      {deleted && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Posting deleted.
         </p>
       )}
       {error && (
@@ -149,7 +165,7 @@ export default async function JobsPage({
         {!feedError && jobs && jobs.length > 0 && (
           <ul className="mt-3 flex flex-col gap-3">
             {jobs.map((j) => (
-              <JobCard key={j.id} job={j} />
+              <JobCard key={j.id} job={j} canManage={!!isAdmin} />
             ))}
           </ul>
         )}
@@ -157,44 +173,10 @@ export default async function JobsPage({
 
       <form action={submitJob} className="flex flex-col gap-3">
         <Section label="Share a job" index={2}>
-          <FieldRow label="Title" help="e.g. Senior Product Manager.">
-            <Input name="title" required maxLength={120} placeholder="Job title" />
-          </FieldRow>
-          <FieldRow label="Company">
-            <Input name="company" required maxLength={120} placeholder="Company" />
-          </FieldRow>
-          <FieldRow label="Location" help="Optional. City / remote / hybrid.">
-            <Input name="location" maxLength={120} placeholder="e.g. NYC or Remote" />
-          </FieldRow>
-          <FieldRow
-            label="Apply link"
-            help="Optional. Must be an http(s) URL — anything else is dropped."
-          >
-            <Input name="apply_url" type="url" placeholder="https://…" />
-          </FieldRow>
-          <FieldRow
-            label="Contact"
-            help="Optional. How interested classmates reach you or the hiring team."
-          >
-            <Input
-              name="contact"
-              maxLength={120}
-              placeholder="e.g. jane@company.com"
-            />
-          </FieldRow>
-          <FieldRow
-            label="Description"
-            help="What the role is, who it fits, anything a classmate should know. Postings are reviewed before going live."
-          >
-            <textarea
-              name="description"
-              required
-              maxLength={5000}
-              rows={6}
-              placeholder="Tell the class about the role…"
-              className="w-full rounded border border-line bg-cream px-3 py-2 text-sm text-ink placeholder:text-ink-3/70 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-            />
-          </FieldRow>
+          <JobFields />
+          <p className="pt-1 text-xs text-ink-3">
+            Postings are reviewed before going live.
+          </p>
           <div className="flex justify-end pt-2">
             <SubmitButton pendingLabel="Submitting…">
               Submit for review

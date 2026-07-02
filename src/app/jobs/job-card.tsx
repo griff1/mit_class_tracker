@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { safeHttpUrl } from "@/lib/url-safety";
 
 /**
@@ -24,7 +25,14 @@ export type JobRow = {
 export const JOB_SELECT =
   "id, title, company, location, apply_url, contact, description, status, created_at, posted_by, profiles(name, mit_email)";
 
-export function JobCard({ job }: { job: JobRow }) {
+export function JobCard({
+  job,
+  canManage = false,
+}: {
+  job: JobRow;
+  /** When true (admin viewer), render an Edit link into the manage page. */
+  canManage?: boolean;
+}) {
   const posterName =
     job.profiles?.name?.trim() || job.profiles?.mit_email || "A member";
   // Render-time URL guard, same defense-in-depth as LinkedIn links.
@@ -60,10 +68,22 @@ export function JobCard({ job }: { job: JobRow }) {
             href={applyHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto text-xs font-medium text-brand-700 underline-offset-4 hover:underline"
+            className={`text-xs font-medium text-brand-700 underline-offset-4 hover:underline ${
+              applyHref ? "ml-auto" : ""
+            }`}
           >
             Apply →
           </a>
+        )}
+        {canManage && (
+          <Link
+            href={`/jobs/${job.id}/edit`}
+            className={`text-xs font-medium text-ink-2 underline-offset-4 hover:text-brand-700 hover:underline ${
+              applyHref ? "" : "ml-auto"
+            }`}
+          >
+            Edit
+          </Link>
         )}
       </div>
     </li>
