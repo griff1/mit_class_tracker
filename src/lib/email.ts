@@ -62,18 +62,27 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
   }
 }
 
+export type JobEmailMessage = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  /** Per-recipient tokenized unsubscribe URL (also embedded in the body). */
+  unsubscribeUrl: string;
+};
+
 /**
- * Broadcast one email to many recipients via BCC, chunked so no single message
- * exceeds Resend's per-message recipient cap. Recipients are hidden from each
- * other (bcc). `to` is set to the From address (Resend requires a `to`). Used
- * for the job mailing list (instant + weekly digest). Deduped, case-folded.
+ * Send the job mailing-list emails one-per-recipient via Resend's batch
+ * endpoint, chunked at 100. Each message carries RFC 8058 one-click headers
+ * (`List-Unsubscribe` + `List-Unsubscribe-Post`) pointing at that recipient's
+ * tokenized URL, so Gmail/Outlook render a native Unsubscribe button. Per
+ * recipient (not BCC) is required precisely because the token differs per
+ * person.
  */
-export async function sendBroadcast(
-  recipients: string[],
-  subject: string,
-  text: string,
-  html: string,
+export async function sendJobEmails(
+  messages: JobEmailMessage[],
 ): Promise<void> {
+  if (messages.length === 0) return;
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -81,23 +90,30 @@ export async function sendBroadcast(
     );
   }
   const from = process.env.REFERRAL_EMAIL_FROM ?? DEFAULT_FROM;
-  const unique = Array.from(
-    new Set(recipients.map((r) => r.trim().toLowerCase()).filter(Boolean)),
-  );
-  const CHUNK = 45; // stay under Resend's 50-recipient-per-message limit
-  for (let i = 0; i < unique.length; i += CHUNK) {
-    const bcc = unique.slice(i, i + CHUNK);
-    const res = await fetch("https://api.resend.com/emails", {
+  const CHUNK = 100;
+  for (let i = 0; i < messages.length; i += CHUNK) {
+    const batch = messages.slice(i, i + CHUNK).map((m) => ({
+      from,
+      to: [m.to],
+      subject: m.subject,
+      text: m.text,
+      html: m.html,
+      headers: {
+        "List-Unsubscribe": `<${m.unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    }));
+    const res = await fetch("https://api.resend.com/emails/batch", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [from], bcc, subject, text, html }),
+      body: JSON.stringify(batch),
     });
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Resend ${res.status}: ${body.slice(0, 300)}`);
+      throw new Error(`Resend batch ${res.status}: ${body.slice(0, 300)}`);
     }
   }
 }
@@ -237,7 +253,12 @@ export function renderJobAlertEmail({
  * card's inner HTML. The footer explains why they're receiving it and how to
  * turn it off (self-service on the Jobs page) — basic list hygiene.
  */
-function jobEmailShell(subject: string, inner: string): string {
+function jobEmailShell(
+  subject: string,
+  inner: string,
+  unsubscribeUrl: string,
+): string {
+  const unsub = escapeHtml(unsubscribeUrl);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -259,7 +280,8 @@ ${inner}
           <tr>
             <td style="padding:16px 8px 0 8px;">
               <p style="margin:0; font-family:${SANS}; font-size:11px; line-height:1.5; color:${EMAIL.ink3};">
-                You&rsquo;re getting this because you turned on job alerts in Sloanopedia. Change the frequency or turn it off on the Jobs page.
+                You&rsquo;re getting this because you turned on job alerts in Sloanopedia.
+                <a href="${unsub}" style="color:${EMAIL.ink3}; text-decoration:underline;">Unsubscribe</a>, or change the frequency on the Jobs page.
               </p>
             </td>
           </tr>
@@ -289,6 +311,7 @@ export type JobPostedEmailInput = {
   location: string | null;
   excerpt: string;
   jobsUrl: string;
+  unsubscribeUrl: string;
 };
 
 /** Instant alert: a single newly-approved posting. */
@@ -298,6 +321,7 @@ export function renderJobPostedEmail({
   location,
   excerpt,
   jobsUrl,
+  unsubscribeUrl,
 }: JobPostedEmailInput): { subject: string; text: string; html: string } {
   const t = escapeHtml(title);
   const co = escapeHtml(company);
@@ -316,7 +340,7 @@ export function renderJobPostedEmail({
     `See it on the jobs board:`,
     jobsUrl,
     ``,
-    `Manage your job alerts on the Jobs page.`,
+    `Unsubscribe from job alerts: ${unsubscribeUrl}`,
   ].join("\n");
 
   const inner = `              <p style="margin:0 0 14px 0; font-family:${MONO}; font-size:11px; line-height:1; letter-spacing:0.14em; text-transform:uppercase; color:${EMAIL.coral};">
@@ -333,18 +357,20 @@ export function renderJobPostedEmail({
               </p>
               ${jobButton(url, "View on the jobs board &rarr;")}`;
 
-  return { subject, text, html: jobEmailShell(subject, inner) };
+  return { subject, text, html: jobEmailShell(subject, inner, unsubscribeUrl) };
 }
 
 export type JobDigestEmailInput = {
   jobs: { title: string; company: string; location: string | null }[];
   jobsUrl: string;
+  unsubscribeUrl: string;
 };
 
 /** Weekly digest: the past 7 days of approved postings. */
 export function renderJobDigestEmail({
   jobs,
   jobsUrl,
+  unsubscribeUrl,
 }: JobDigestEmailInput): { subject: string; text: string; html: string } {
   const url = escapeHtml(jobsUrl);
   const count = jobs.length;
@@ -360,7 +386,7 @@ export function renderJobDigestEmail({
     `See them all:`,
     jobsUrl,
     ``,
-    `Manage your job alerts on the Jobs page.`,
+    `Unsubscribe from job alerts: ${unsubscribeUrl}`,
   ].join("\n");
 
   const rows = jobs
@@ -381,7 +407,7 @@ export function renderJobDigestEmail({
 ${rows}
               ${jobButton(url, "View the jobs board &rarr;")}`;
 
-  return { subject, text, html: jobEmailShell(subject, inner) };
+  return { subject, text, html: jobEmailShell(subject, inner, unsubscribeUrl) };
 }
 
 export type ReferralEmailInput = {

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { renderJobDigestEmail, sendBroadcast } from "@/lib/email";
+import { renderJobDigestEmail, sendJobEmails } from "@/lib/email";
 
 /**
  * Weekly job digest, invoked by Vercel Cron (see vercel.json).
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
   const payload = data as {
     ok: boolean;
-    recipients?: string[];
+    recipients?: { email: string; token: string }[];
     jobs?: { title: string; company: string; location: string | null }[];
   } | null;
   if (!payload?.ok) {
@@ -46,7 +46,9 @@ export async function GET(request: Request) {
     return new Response("Digest secret rejected", { status: 401 });
   }
 
-  const recipients = payload.recipients ?? [];
+  const recipients = (payload.recipients ?? []).filter(
+    (r) => !!r.email && !!r.token,
+  );
   const jobs = payload.jobs ?? [];
   if (recipients.length === 0 || jobs.length === 0) {
     return Response.json({
@@ -58,11 +60,17 @@ export async function GET(request: Request) {
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { subject, text, html } = renderJobDigestEmail({
-    jobs,
-    jobsUrl: `${siteUrl}/jobs`,
+  const jobsUrl = `${siteUrl}/jobs`;
+  const messages = recipients.map((r) => {
+    const unsubscribeUrl = `${siteUrl}/api/jobs/unsubscribe?token=${encodeURIComponent(r.token)}`;
+    const { subject, text, html } = renderJobDigestEmail({
+      jobs,
+      jobsUrl,
+      unsubscribeUrl,
+    });
+    return { to: r.email, subject, text, html, unsubscribeUrl };
   });
-  await sendBroadcast(recipients, subject, text, html);
+  await sendJobEmails(messages);
 
-  return Response.json({ ok: true, sent: recipients.length, jobs: jobs.length });
+  return Response.json({ ok: true, sent: messages.length, jobs: jobs.length });
 }

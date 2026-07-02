@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   renderJobAlertEmail,
   renderJobPostedEmail,
-  sendBroadcast,
   sendEmail,
+  sendJobEmails,
 } from "@/lib/email";
 import { JOB_ALERT_FREQUENCIES } from "@/lib/types";
 import { safeHttpUrl } from "@/lib/url-safety";
@@ -261,31 +261,37 @@ async function dispatchInstantAlerts(
     description: string;
   },
 ) {
-  // The admin's session can read every profile (select policy = any
-  // authenticated), so this reads instant subscribers directly.
-  const { data: subs } = await supabase
-    .from("profiles")
-    .select("personal_email, mit_email")
-    .eq("job_alert_frequency", "instant");
-  const recipients = (subs ?? [])
-    .map((s) => s.personal_email ?? s.mit_email)
-    .filter((e): e is string => !!e);
-  if (recipients.length === 0) return;
+  // instant_job_subscribers() is admin-gated and returns each subscriber's
+  // unsubscribe token (the token table is API-unreachable). reviewJob runs in
+  // the admin session, so this returns the list.
+  const { data: subs } = await supabase.rpc("instant_job_subscribers");
+  const list = (subs ?? []) as { email: string; token: string }[];
+  if (list.length === 0) return;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const { subject, text, html } = renderJobPostedEmail({
-    title: job.title,
-    company: job.company,
-    location: job.location,
-    excerpt:
-      job.description.length > 300
-        ? `${job.description.slice(0, 300)}…`
-        : job.description,
-    jobsUrl: `${siteUrl}/jobs`,
-  });
+  const excerpt =
+    job.description.length > 300
+      ? `${job.description.slice(0, 300)}…`
+      : job.description;
+
+  const messages = list
+    .filter((s) => !!s.email && !!s.token)
+    .map((s) => {
+      const unsubscribeUrl = `${siteUrl}/api/jobs/unsubscribe?token=${encodeURIComponent(s.token)}`;
+      const { subject, text, html } = renderJobPostedEmail({
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        excerpt,
+        jobsUrl: `${siteUrl}/jobs`,
+        unsubscribeUrl,
+      });
+      return { to: s.email, subject, text, html, unsubscribeUrl };
+    });
+
   after(async () => {
     try {
-      await sendBroadcast(recipients, subject, text, html);
+      await sendJobEmails(messages);
     } catch {
       // Swallowed: the posting is live regardless of alert delivery.
     }
