@@ -102,6 +102,7 @@ export default async function JobsPage({
       <PageHeader
         eyebrow="Sloanies helping Sloanies"
         title="Jobs"
+        badge="Beta"
         count={
           jobs
             ? `${jobs.length} ${jobs.length === 1 ? "posting" : "postings"}`
