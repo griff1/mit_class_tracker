@@ -16,7 +16,7 @@ export type JobRow = {
   apply_url: string | null;
   contact: string | null;
   description: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "closed";
   created_at: string;
   posted_by: string;
   profiles: { name: string | null; mit_email: string } | null;
@@ -102,6 +102,13 @@ export function JobStatusPill({ status }: { status: JobRow["status"] }) {
     return (
       <span className="rounded-sm border border-red-200 bg-red-50 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-red-800">
         Not approved
+      </span>
+    );
+  }
+  if (status === "closed") {
+    return (
+      <span className="rounded-sm border border-line-2 bg-cream px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-2">
+        Filled
       </span>
     );
   }

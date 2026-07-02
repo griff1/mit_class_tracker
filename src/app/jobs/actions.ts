@@ -89,6 +89,36 @@ export async function submitJob(formData: FormData) {
   redirect("/jobs?submitted=1");
 }
 
+export async function toggleJobFilled(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  const id = trimmed(formData.get("id"));
+  const filled = trimmed(formData.get("filled")) === "true";
+  if (!id) redirect("/jobs");
+
+  // The RPC enforces owner-or-admin + approved<->closed only, returning false
+  // on any violation — so a non-owner can't close someone else's listing and
+  // a pending/rejected posting can't be flipped live through this path.
+  const { data: ok, error } = await supabase.rpc("set_job_closed", {
+    p_id: id,
+    p_closed: filled,
+  });
+  if (error || !ok) {
+    redirect(
+      `/jobs?error=${encodeURIComponent(
+        error?.message ?? "Couldn't update that listing.",
+      )}`,
+    );
+  }
+
+  revalidatePath("/jobs");
+  redirect(`/jobs?${filled ? "filled" : "reopened"}=1`);
+}
+
 export async function updateJob(formData: FormData) {
   const supabase = await createClient();
   const {

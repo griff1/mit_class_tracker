@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Section } from "@/components/section";
 import { Input } from "@/components/inputs";
 import { SubmitButton } from "@/components/submit-button";
-import { submitJob } from "./actions";
+import { submitJob, toggleJobFilled } from "./actions";
 import { JobFields } from "./job-form-fields";
 import {
   JOB_SELECT,
@@ -25,10 +25,20 @@ export default async function JobsPage({
     submitted?: string;
     updated?: string;
     deleted?: string;
+    filled?: string;
+    reopened?: string;
     error?: string;
   }>;
 }) {
-  const { q: rawQ, submitted, updated, deleted, error } = await searchParams;
+  const {
+    q: rawQ,
+    submitted,
+    updated,
+    deleted,
+    filled,
+    reopened,
+    error,
+  } = await searchParams;
   const q = (rawQ ?? "").trim();
 
   const supabase = await createClient();
@@ -120,6 +130,17 @@ export default async function JobsPage({
           Posting deleted.
         </p>
       )}
+      {filled && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Listing marked filled — it&apos;s no longer shown on the board. You
+          can reopen it from &ldquo;Your submissions&rdquo;.
+        </p>
+      )}
+      {reopened && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Listing reopened — it&apos;s live on the board again.
+        </p>
+      )}
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
           {error}
@@ -206,7 +227,33 @@ export default async function JobsPage({
                     submitted {fmtDate(j.created_at)}
                   </span>
                 </div>
-                <JobStatusPill status={j.status} />
+                <div className="flex flex-none items-center gap-2">
+                  <JobStatusPill status={j.status} />
+                  {j.status === "approved" && (
+                    <form action={toggleJobFilled}>
+                      <input type="hidden" name="id" value={j.id} />
+                      <input type="hidden" name="filled" value="true" />
+                      <button
+                        type="submit"
+                        className="rounded-md border border-line-2 bg-paper px-2.5 py-1 text-xs font-medium text-ink-2 transition hover:bg-cream"
+                      >
+                        Mark filled
+                      </button>
+                    </form>
+                  )}
+                  {j.status === "closed" && (
+                    <form action={toggleJobFilled}>
+                      <input type="hidden" name="id" value={j.id} />
+                      <input type="hidden" name="filled" value="false" />
+                      <button
+                        type="submit"
+                        className="rounded-md border border-line-2 bg-paper px-2.5 py-1 text-xs font-medium text-ink-2 transition hover:bg-cream"
+                      >
+                        Reopen
+                      </button>
+                    </form>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
