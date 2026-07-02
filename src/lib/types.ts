@@ -14,9 +14,16 @@ export type Profile = {
   ocean: string | null;
   program: string | null;
   activities: string[];
+  job_alert_frequency: JobAlertFrequency;
   created_at: string;
   updated_at: string;
 };
+
+// Opt-in job-posting email preference. App-enforced allow-list (no DB CHECK,
+// same posture as ocean/program). 'instant' = emailed on each approval,
+// 'weekly' = a Monday digest.
+export const JOB_ALERT_FREQUENCIES = ["off", "instant", "weekly"] as const;
+export type JobAlertFrequency = (typeof JOB_ALERT_FREQUENCIES)[number];
 
 // Seed list for industries. Members can add new entries which then appear as
 // chips for everyone in the cohort. Server-side `resolveCanonical` handles

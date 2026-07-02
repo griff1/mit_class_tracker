@@ -62,6 +62,46 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
   }
 }
 
+/**
+ * Broadcast one email to many recipients via BCC, chunked so no single message
+ * exceeds Resend's per-message recipient cap. Recipients are hidden from each
+ * other (bcc). `to` is set to the From address (Resend requires a `to`). Used
+ * for the job mailing list (instant + weekly digest). Deduped, case-folded.
+ */
+export async function sendBroadcast(
+  recipients: string[],
+  subject: string,
+  text: string,
+  html: string,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "RESEND_API_KEY is not configured. Set it in Vercel env to enable job emails.",
+    );
+  }
+  const from = process.env.REFERRAL_EMAIL_FROM ?? DEFAULT_FROM;
+  const unique = Array.from(
+    new Set(recipients.map((r) => r.trim().toLowerCase()).filter(Boolean)),
+  );
+  const CHUNK = 45; // stay under Resend's 50-recipient-per-message limit
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const bcc = unique.slice(i, i + CHUNK);
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [from], bcc, subject, text, html }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Resend ${res.status}: ${body.slice(0, 300)}`);
+    }
+  }
+}
+
 /** Basic HTML escape for interpolating untrusted strings into our email templates. */
 export function escapeHtml(s: string): string {
   return s
@@ -190,6 +230,158 @@ export function renderJobAlertEmail({
 </html>`;
 
   return { subject, text, html };
+}
+
+/**
+ * Shared card+footer wrapper for the job mailing-list emails. `inner` is the
+ * card's inner HTML. The footer explains why they're receiving it and how to
+ * turn it off (self-service on the Jobs page) — basic list hygiene.
+ */
+function jobEmailShell(subject: string, inner: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:0; background-color:${EMAIL.cream}; -webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${EMAIL.cream};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px; max-width:480px;">
+          <tr>
+            <td style="background-color:${EMAIL.paper}; border:1px solid ${EMAIL.line}; border-radius:6px; padding:32px;">
+${inner}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 8px 0 8px;">
+              <p style="margin:0; font-family:${SANS}; font-size:11px; line-height:1.5; color:${EMAIL.ink3};">
+                You&rsquo;re getting this because you turned on job alerts in Sloanopedia. Change the frequency or turn it off on the Jobs page.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function jobButton(url: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
+                <tr>
+                  <td align="center" bgcolor="${EMAIL.ink}" style="border-radius:6px;">
+                    <a href="${url}" target="_blank" style="display:inline-block; padding:12px 24px; font-family:${SANS}; font-size:14px; font-weight:600; line-height:1; color:${EMAIL.cream}; text-decoration:none; border-radius:6px;">
+                      ${label}
+                    </a>
+                  </td>
+                </tr>
+              </table>`;
+}
+
+export type JobPostedEmailInput = {
+  title: string;
+  company: string;
+  location: string | null;
+  excerpt: string;
+  jobsUrl: string;
+};
+
+/** Instant alert: a single newly-approved posting. */
+export function renderJobPostedEmail({
+  title,
+  company,
+  location,
+  excerpt,
+  jobsUrl,
+}: JobPostedEmailInput): { subject: string; text: string; html: string } {
+  const t = escapeHtml(title);
+  const co = escapeHtml(company);
+  const loc = location ? escapeHtml(location) : "";
+  const ex = escapeHtml(excerpt);
+  const url = escapeHtml(jobsUrl);
+
+  const subject = `New job: ${title} at ${company}`;
+  const text = [
+    `A new job was posted on Sloanopedia.`,
+    ``,
+    `${title} — ${company}${location ? ` (${location})` : ""}`,
+    ``,
+    excerpt,
+    ``,
+    `See it on the jobs board:`,
+    jobsUrl,
+    ``,
+    `Manage your job alerts on the Jobs page.`,
+  ].join("\n");
+
+  const inner = `              <p style="margin:0 0 14px 0; font-family:${MONO}; font-size:11px; line-height:1; letter-spacing:0.14em; text-transform:uppercase; color:${EMAIL.coral};">
+                Sloanopedia jobs
+              </p>
+              <h1 style="margin:0 0 16px 0; font-family:${SANS}; font-size:22px; line-height:1.25; font-weight:600; letter-spacing:-0.01em; color:${EMAIL.ink};">
+                New job posting
+              </h1>
+              <p style="margin:0 0 8px 0; font-family:${SANS}; font-size:15px; line-height:1.5; color:${EMAIL.ink};">
+                <strong>${t}</strong> <span style="color:${EMAIL.ink2};">— ${co}${loc ? ` (${loc})` : ""}</span>
+              </p>
+              <p style="margin:0 0 8px 0; font-family:${SANS}; font-size:13px; line-height:1.5; color:${EMAIL.ink2};">
+                ${ex}
+              </p>
+              ${jobButton(url, "View on the jobs board &rarr;")}`;
+
+  return { subject, text, html: jobEmailShell(subject, inner) };
+}
+
+export type JobDigestEmailInput = {
+  jobs: { title: string; company: string; location: string | null }[];
+  jobsUrl: string;
+};
+
+/** Weekly digest: the past 7 days of approved postings. */
+export function renderJobDigestEmail({
+  jobs,
+  jobsUrl,
+}: JobDigestEmailInput): { subject: string; text: string; html: string } {
+  const url = escapeHtml(jobsUrl);
+  const count = jobs.length;
+  const subject = `${count} new ${count === 1 ? "job" : "jobs"} on Sloanopedia this week`;
+
+  const text = [
+    `This week on the Sloanopedia jobs board:`,
+    ``,
+    ...jobs.map(
+      (j) => `• ${j.title} — ${j.company}${j.location ? ` (${j.location})` : ""}`,
+    ),
+    ``,
+    `See them all:`,
+    jobsUrl,
+    ``,
+    `Manage your job alerts on the Jobs page.`,
+  ].join("\n");
+
+  const rows = jobs
+    .map(
+      (j) =>
+        `              <p style="margin:0 0 10px 0; font-family:${SANS}; font-size:14px; line-height:1.4; color:${EMAIL.ink};">
+                <strong>${escapeHtml(j.title)}</strong> <span style="color:${EMAIL.ink2};">— ${escapeHtml(j.company)}${j.location ? ` (${escapeHtml(j.location)})` : ""}</span>
+              </p>`,
+    )
+    .join("\n");
+
+  const inner = `              <p style="margin:0 0 14px 0; font-family:${MONO}; font-size:11px; line-height:1; letter-spacing:0.14em; text-transform:uppercase; color:${EMAIL.coral};">
+                Sloanopedia jobs
+              </p>
+              <h1 style="margin:0 0 16px 0; font-family:${SANS}; font-size:22px; line-height:1.25; font-weight:600; letter-spacing:-0.01em; color:${EMAIL.ink};">
+                This week&rsquo;s new jobs
+              </h1>
+${rows}
+              ${jobButton(url, "View the jobs board &rarr;")}`;
+
+  return { subject, text, html: jobEmailShell(subject, inner) };
 }
 
 export type ReferralEmailInput = {

@@ -5,9 +5,9 @@ import { getViewer } from "@/lib/viewer";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Section } from "@/components/section";
-import { Input } from "@/components/inputs";
+import { Input, Select } from "@/components/inputs";
 import { SubmitButton } from "@/components/submit-button";
-import { submitJob, toggleJobFilled } from "./actions";
+import { setJobAlerts, submitJob, toggleJobFilled } from "./actions";
 import { JobFields } from "./job-form-fields";
 import {
   JOB_SELECT,
@@ -27,6 +27,7 @@ export default async function JobsPage({
     deleted?: string;
     filled?: string;
     reopened?: string;
+    alerts?: string;
     error?: string;
   }>;
 }) {
@@ -37,6 +38,7 @@ export default async function JobsPage({
     deleted,
     filled,
     reopened,
+    alerts,
     error,
   } = await searchParams;
   const q = (rawQ ?? "").trim();
@@ -75,6 +77,14 @@ export default async function JobsPage({
     .returns<
       Pick<JobRow, "id" | "title" | "company" | "status" | "created_at">[]
     >();
+
+  // Current member's email-alert preference (drives the subscribe control).
+  const { data: prefRow } = await supabase
+    .from("profiles")
+    .select("job_alert_frequency")
+    .eq("id", user.id)
+    .maybeSingle<{ job_alert_frequency: string | null }>();
+  const alertFreq = prefRow?.job_alert_frequency ?? "off";
 
   // Admin? Show the review-queue link with a pending count.
   const { data: isAdmin } = await supabase.rpc("is_admin");
@@ -141,6 +151,11 @@ export default async function JobsPage({
           Listing reopened — it&apos;s live on the board again.
         </p>
       )}
+      {alerts === "saved" && (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          Job alert preference saved.
+        </p>
+      )}
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-sm text-red-800">
           {error}
@@ -192,8 +207,30 @@ export default async function JobsPage({
         )}
       </Section>
 
+      <Section label="Email alerts" index={2}>
+        <form action={setJobAlerts} className="flex flex-col gap-2">
+          <p className="text-sm text-ink-2">
+            Get emailed about new job postings. Change the frequency or turn it
+            off anytime.
+          </p>
+          <div className="flex items-center gap-2">
+            <Select name="frequency" defaultValue={alertFreq}>
+              <option value="off">Off</option>
+              <option value="instant">Each new posting</option>
+              <option value="weekly">Weekly digest</option>
+            </Select>
+            <button
+              type="submit"
+              className="flex-none rounded-md bg-ink px-3.5 py-2 text-xs font-medium text-cream transition hover:bg-ink-2"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </Section>
+
       <form action={submitJob} className="flex flex-col gap-3">
-        <Section label="Share a job" index={2}>
+        <Section label="Share a job" index={3}>
           <JobFields />
           <p className="pt-1 text-xs text-ink-3">
             Postings are reviewed before going live.
@@ -207,7 +244,7 @@ export default async function JobsPage({
       </form>
 
       {mine && mine.length > 0 && (
-        <Section label="Your submissions" index={3}>
+        <Section label="Your submissions" index={4}>
           <ul className="flex flex-col">
             {mine.map((j, idx) => (
               <li

@@ -2,9 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { renderJobAlertEmail, sendEmail } from "@/lib/email";
+import {
+  renderJobAlertEmail,
+  renderJobPostedEmail,
+  sendBroadcast,
+  sendEmail,
+} from "@/lib/email";
+import { JOB_ALERT_FREQUENCIES } from "@/lib/types";
 import { safeHttpUrl } from "@/lib/url-safety";
+
+type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
 /**
  * Where new-posting alerts go. The review queue itself (/jobs/review, RLS
@@ -222,7 +231,7 @@ export async function reviewJob(formData: FormData) {
       reviewed_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .select("id");
+    .select("id, title, company, location, description");
 
   if (error || !updated?.length) {
     redirect(
@@ -232,7 +241,75 @@ export async function reviewJob(formData: FormData) {
     );
   }
 
+  // On approval, fan out instant alerts to opted-in members. Best-effort and
+  // post-response (after()), so approval UX is never blocked on Resend.
+  if (decision === "approve") {
+    await dispatchInstantAlerts(supabase, updated[0]);
+  }
+
   revalidatePath("/jobs");
   revalidatePath("/jobs/review");
   redirect(`/jobs/review?done=${decision}`);
+}
+
+async function dispatchInstantAlerts(
+  supabase: ServerClient,
+  job: {
+    title: string;
+    company: string;
+    location: string | null;
+    description: string;
+  },
+) {
+  // The admin's session can read every profile (select policy = any
+  // authenticated), so this reads instant subscribers directly.
+  const { data: subs } = await supabase
+    .from("profiles")
+    .select("personal_email, mit_email")
+    .eq("job_alert_frequency", "instant");
+  const recipients = (subs ?? [])
+    .map((s) => s.personal_email ?? s.mit_email)
+    .filter((e): e is string => !!e);
+  if (recipients.length === 0) return;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const { subject, text, html } = renderJobPostedEmail({
+    title: job.title,
+    company: job.company,
+    location: job.location,
+    excerpt:
+      job.description.length > 300
+        ? `${job.description.slice(0, 300)}…`
+        : job.description,
+    jobsUrl: `${siteUrl}/jobs`,
+  });
+  after(async () => {
+    try {
+      await sendBroadcast(recipients, subject, text, html);
+    } catch {
+      // Swallowed: the posting is live regardless of alert delivery.
+    }
+  });
+}
+
+export async function setJobAlerts(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in");
+
+  const raw = trimmed(formData.get("frequency"));
+  const frequency = (JOB_ALERT_FREQUENCIES as readonly string[]).includes(raw)
+    ? raw
+    : "off";
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ job_alert_frequency: frequency })
+    .eq("id", user.id);
+  if (error) redirect(`/jobs?error=${encodeURIComponent(error.message)}`);
+
+  revalidatePath("/jobs");
+  redirect("/jobs?alerts=saved");
 }
