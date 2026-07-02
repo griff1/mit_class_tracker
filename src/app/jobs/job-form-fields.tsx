@@ -18,13 +18,16 @@ export function JobFields({
 }) {
   return (
     <>
-      <FieldRow label="Title" help="e.g. Senior Product Manager.">
+      <FieldRow
+        label="Title"
+        help="Full-time, internship, contract, gig — anything. e.g. Senior PM."
+      >
         <Input
           name="title"
           required
           maxLength={120}
           defaultValue={defaults?.title ?? ""}
-          placeholder="Job title"
+          placeholder="Role or opportunity title"
         />
       </FieldRow>
       <FieldRow label="Company">
@@ -68,7 +71,7 @@ export function JobFields({
       </FieldRow>
       <FieldRow
         label="Description"
-        help="What the role is, who it fits, anything a classmate should know."
+        help="What it is, who it's a fit for, anything a classmate should know."
       >
         <textarea
           name="description"

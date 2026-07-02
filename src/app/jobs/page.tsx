@@ -101,7 +101,7 @@ export default async function JobsPage({
     <AppShell active="jobs" user={viewer}>
       <PageHeader
         eyebrow="Sloanies helping Sloanies"
-        title="Jobs"
+        title="Opportunities"
         badge="Beta"
         count={
           jobs
@@ -211,8 +211,8 @@ export default async function JobsPage({
       <Section label="Email alerts" index={2}>
         <form action={setJobAlerts} className="flex flex-col gap-2">
           <p className="text-sm text-ink-2">
-            Get emailed about new job postings. Change the frequency or turn it
-            off anytime.
+            Get emailed about new postings. Change the frequency or turn it off
+            anytime.
           </p>
           <div className="flex items-center gap-2">
             <Select name="frequency" defaultValue={alertFreq}>
@@ -231,7 +231,7 @@ export default async function JobsPage({
       </Section>
 
       <form action={submitJob} className="flex flex-col gap-3">
-        <Section label="Share a job" index={3}>
+        <Section label="Share an opportunity" index={3}>
           <JobFields />
           <p className="pt-1 text-xs text-ink-3">
             Postings are reviewed before going live.

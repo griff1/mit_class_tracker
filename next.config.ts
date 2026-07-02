@@ -37,6 +37,11 @@ const nextConfig: NextConfig = {
       { source: "/sign-up", destination: "/sign-in", permanent: true },
       // /map embedded into the home page. Preserve the old URL.
       { source: "/map", destination: "/", permanent: true },
+      // The Jobs tab is labeled "Opportunities" in the UI, but the route
+      // stays /jobs (all sent email links, /api/jobs/*, and the cron point
+      // there). Let the label-matching URL resolve too. Non-permanent so we
+      // keep the freedom to flip canonical later.
+      { source: "/opportunities", destination: "/jobs", permanent: false },
     ];
   },
 };

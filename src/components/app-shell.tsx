@@ -15,7 +15,7 @@ type SectionKey =
 const SECTIONS: { key: SectionKey; href: string; label: string; available: boolean }[] = [
   { key: "home", href: "/", label: "Home", available: true },
   { key: "directory", href: "/directory", label: "Directory", available: true },
-  { key: "jobs", href: "/jobs", label: "Jobs", available: true },
+  { key: "jobs", href: "/jobs", label: "Opportunities", available: true },
   { key: "stats", href: "/stats", label: "Stats", available: true },
   { key: "referrals", href: "/referrals", label: "Referrals", available: true },
   { key: "profile", href: "/profile", label: "Profile", available: true },
